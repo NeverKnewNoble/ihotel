@@ -11,6 +11,7 @@ import string
 
 class Reservation(Document):
 	def validate(self):
+		self.validate_restricted_guest()
 		self.validate_dates()
 		self.calculate_days()
 		self.calculate_totals()
@@ -19,10 +20,27 @@ class Reservation(Document):
 		self.validate_status_transition()
 		self.sync_guest_details()
 
+	def validate_restricted_guest(self):
+		"""Warn (but don't hard-block) if the linked guest profile is restricted."""
+		if not self.guest:
+			return
+		restricted, note = frappe.db.get_value(
+			"Guest", self.guest, ["restricted", "restriction_note"]
+		) or (0, "")
+		if restricted:
+			msg = _("Guest {0} is marked as Restricted.").format(self.guest)
+			if note:
+				msg += " {0}: {1}".format(_("Reason"), note)
+			frappe.throw(msg, title=_("Restricted Guest"))
+
 	def validate_dates(self):
 		if self.check_in_date and self.check_out_date:
 			if getdate(self.check_in_date) >= getdate(self.check_out_date):
 				frappe.throw(_("Check-in date must be before check-out date"))
+
+		if self.is_new() and self.check_in_date:
+			if getdate(self.check_in_date) < getdate(nowdate()):
+				frappe.throw(_("Check-in date cannot be in the past"))
 
 	def calculate_days(self):
 		if self.check_in_date and self.check_out_date:
@@ -41,6 +59,13 @@ class Reservation(Document):
 	def validate_room_availability(self):
 		if not self.room or self.status == "cancelled":
 			return
+
+		# Block rooms that are permanently out of service
+		room_status = frappe.db.get_value("Room", self.room, "status")
+		if room_status in ("Out of Order", "Out of Service"):
+			frappe.throw(
+				_("Room {0} is {1} and cannot be reserved.").format(self.room, room_status)
+			)
 
 		overlapping = frappe.db.sql("""
 			SELECT name FROM `tabReservation`
@@ -104,6 +129,33 @@ class Reservation(Document):
 			self.cancellation_number = "CXL-" + "".join(
 				random.choices(string.ascii_uppercase + string.digits, k=8)
 			)
+			self.calculate_cancellation_fee()
+
+	def calculate_cancellation_fee(self):
+		"""Calculate cancellation penalty based on the Rate Type's cancellation policy."""
+		if not self.rate_type:
+			self.cancellation_fee = 0
+			return
+
+		try:
+			rt = frappe.get_cached_doc("Rate Type", self.rate_type)
+		except Exception:
+			self.cancellation_fee = 0
+			return
+
+		fee_type = rt.cancellation_fee_type or "None"
+
+		if fee_type == "None":
+			self.cancellation_fee = 0
+		elif fee_type == "First Night":
+			self.cancellation_fee = self.rent or 0
+		elif fee_type == "Fixed Amount":
+			self.cancellation_fee = rt.cancellation_fee_value or 0
+		elif fee_type == "Percentage of Stay":
+			pct = (rt.cancellation_fee_value or 0) / 100.0
+			self.cancellation_fee = round((self.total_charges or 0) * pct, 2)
+		else:
+			self.cancellation_fee = 0
 
 	def sync_guest_details(self):
 		"""If a Guest profile is selected, auto-fill contact fields."""
@@ -126,7 +178,7 @@ def convert_to_hotel_stay(reservation_name):
 		frappe.throw(_("Cannot convert a cancelled reservation"))
 
 	if reservation.hotel_stay:
-		frappe.throw(_("This reservation has already been converted to Check In: {0}").format(
+		frappe.throw(_("This reservation has already been converted to Checked In: {0}").format(
 			reservation.hotel_stay
 		))
 
@@ -155,7 +207,7 @@ def convert_to_hotel_stay(reservation_name):
 		check_out_dt = f"{reservation.check_out_date} {check_out_time}"
 
 	hotel_stay = frappe.get_doc({
-		"doctype": "Check In",
+		"doctype": "Checked In",
 		"guest": guest,
 		"room": reservation.room,
 		"room_type": reservation.room_type,
@@ -176,8 +228,8 @@ def convert_to_hotel_stay(reservation_name):
 	reservation.db_set("status", "confirmed")
 
 	frappe.msgprint(
-		_("Check In {0} created successfully").format(
-			frappe.utils.get_link_to_form("Check In", hotel_stay.name)
+		_("Checked In {0} created successfully").format(
+			frappe.utils.get_link_to_form("Checked In", hotel_stay.name)
 		),
 		indicator="green",
 		alert=True,

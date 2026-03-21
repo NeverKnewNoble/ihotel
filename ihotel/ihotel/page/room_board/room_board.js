@@ -108,6 +108,21 @@ frappe.pages["room_board"].on_page_load = function (wrapper) {
 				<div class="rb-loading">Loading…</div>
 			</div>
 
+			<!-- Status Legend -->
+			<div class="rb-legend">
+				<div class="rb-legend-title">Status Legend</div>
+				<div class="rb-legend-grid">
+					<div class="rb-legend-item"><span class="rb-dot" style="background:#10b981;"></span><span><b>Available</b> — Clean &amp; ready for check-in</span></div>
+					<div class="rb-legend-item"><span class="rb-dot" style="background:#3b82f6;"></span><span><b>Occupied</b> — Guest currently in room</span></div>
+					<div class="rb-legend-item"><span class="rb-dot" style="background:#f97316;"></span><span><b>Dirty</b> — Checked out, awaiting housekeeping</span></div>
+					<div class="rb-legend-item"><span class="rb-dot" style="background:#a855f7;"></span><span><b>Pickup</b> — Cleaning in progress</span></div>
+					<div class="rb-legend-item"><span class="rb-dot" style="background:#06b6d4;"></span><span><b>Inspected</b> — Cleaned &amp; inspector-approved</span></div>
+					<div class="rb-legend-item"><span class="rb-dot" style="background:#f59e0b;"></span><span><b>Housekeeping</b> — Scheduled maintenance clean</span></div>
+					<div class="rb-legend-item"><span class="rb-dot" style="background:#ef4444;"></span><span><b>Out of Order</b> — Cannot be sold (maintenance)</span></div>
+					<div class="rb-legend-item"><span class="rb-dot" style="background:#6b7280;"></span><span><b>Out of Service</b> — Temporarily removed from inventory</span></div>
+				</div>
+			</div>
+
 		</div>
 	`);
 
@@ -120,10 +135,14 @@ frappe.pages["room_board"].on_page_show = function (wrapper) {
 	}
 };
 
+// Statuses where a room is ready to accept a walk-in
+const CHECK_IN_READY = new Set(["Available", "Inspected", "Pickup"]);
+
 class RoomBoard {
 	constructor(page) {
 		this.page = page;
 		this.all_rooms = [];
+		this.room_map  = {};   // name → room object, for dialog lookup
 		this.active_status = "";
 
 		this.$search       = page.main.find(".rb-search");
@@ -157,6 +176,19 @@ class RoomBoard {
 			this.apply_filters();
 		});
 
+		// Card navigation (skip when clicking the check-in button)
+		this.$grid.on("click", ".rb-card[data-href]", (e) => {
+			if ($(e.target).closest(".rb-checkin-btn").length) return;
+			window.location.href = $(e.currentTarget).data("href");
+		});
+
+		// Check-in button
+		this.$grid.on("click", ".rb-checkin-btn", (e) => {
+			e.stopPropagation();
+			const room_name = $(e.currentTarget).data("room");
+			this.show_check_in_dialog(this.room_map[room_name]);
+		});
+
 		this.refresh();
 	}
 
@@ -167,6 +199,7 @@ class RoomBoard {
 			callback: (r) => {
 				if (r.message) {
 					this.all_rooms = r.message;
+					this.room_map  = Object.fromEntries(r.message.map(rm => [rm.name, rm]));
 					this.populate_dropdowns();
 					this.apply_filters();
 				}
@@ -255,18 +288,31 @@ class RoomBoard {
 
 		const cards = rooms.map(room => {
 			const color = status_colors[room.status] || "#6b7280";
+			const href  = room.stay
+				? `/app/checked-in/${encodeURIComponent(room.stay)}`
+				: `/app/room/${encodeURIComponent(room.name)}`;
+
 			const guest_html = room.guest
 				? `<div class="rb-guest">${frappe.utils.escape_html(room.guest)}</div>`
 				: "";
 			const checkout_html = room.check_out
 				? `<div class="rb-checkout">Out: ${frappe.datetime.str_to_user(room.check_out)}</div>`
 				: "";
-			const href = room.stay
-				? `/app/check-in/${encodeURIComponent(room.stay)}`
-				: `/app/room/${encodeURIComponent(room.name)}`;
+			const checkin_btn = CHECK_IN_READY.has(room.status)
+				? `<button class="rb-checkin-btn" data-room="${frappe.utils.escape_html(room.name)}">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+							stroke-linecap="round" stroke-linejoin="round">
+							<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+							<polyline points="10 17 15 12 10 7"/>
+							<line x1="15" y1="12" x2="3" y2="12"/>
+						</svg>
+						Check In
+					</button>`
+				: "";
 
 			return `
-				<a href="${href}" class="rb-card" style="--rb-status-color:${color};">
+				<div class="rb-card" data-href="${href}"
+					style="--rb-status-color:${color}; cursor:pointer;">
 					<div class="rb-card-top">
 						<div class="rb-room-number">${frappe.utils.escape_html(room.room_number || room.name)}</div>
 						<div class="rb-status-dot-sm" style="background:${color};"></div>
@@ -276,9 +322,116 @@ class RoomBoard {
 					<div class="rb-status-label" style="color:${color};">${frappe.utils.escape_html(room.status)}</div>
 					${guest_html}
 					${checkout_html}
-				</a>`;
+					${checkin_btn}
+				</div>`;
 		}).join("");
 
 		this.$grid.html(`<div class="rb-grid">${cards}</div>`);
+	}
+
+	show_check_in_dialog(room) {
+		const d = new frappe.ui.Dialog({
+			title: `Check In — Room ${frappe.utils.escape_html(room.room_number || room.name)}`,
+			fields: [
+				{
+					fieldtype: "Link",
+					fieldname: "guest",
+					label: "Guest",
+					options: "Guest",
+					reqd: 1,
+				},
+				{ fieldtype: "Column Break" },
+				{
+					fieldtype: "Data",
+					fieldname: "room_display",
+					label: "Room",
+					default: room.room_number || room.name,
+					read_only: 1,
+				},
+				{ fieldtype: "Section Break" },
+				{
+					fieldtype: "Datetime",
+					fieldname: "expected_check_in",
+					label: "Expected Check In",
+					reqd: 1,
+					default: frappe.datetime.now_datetime(),
+				},
+				{ fieldtype: "Column Break" },
+				{
+					fieldtype: "Datetime",
+					fieldname: "expected_check_out",
+					label: "Expected Check Out",
+					reqd: 1,
+				},
+				{ fieldtype: "Section Break" },
+				{
+					fieldtype: "Link",
+					fieldname: "rate_type",
+					label: "Rate Type",
+					options: "Rate Type",
+				},
+				{ fieldtype: "Column Break" },
+				{
+					fieldtype: "Currency",
+					fieldname: "room_rate",
+					label: "Room Rate",
+					reqd: 1,
+					default: room.rack_rate || 0,
+				},
+			],
+			primary_action_label: "Check In",
+			primary_action(values) {
+				frappe.call({
+					method: "ihotel.ihotel.page.room_board.room_board.quick_check_in",
+					args: {
+						room: room.name,
+						guest: values.guest,
+						expected_check_in: values.expected_check_in,
+						expected_check_out: values.expected_check_out,
+						room_rate: values.room_rate,
+						rate_type: values.rate_type || null,
+					},
+					btn: d.get_primary_btn(),
+					callback(r) {
+						if (r.message) {
+							d.hide();
+							frappe.show_alert({
+								message: __("Checked In: {0}", [r.message]),
+								indicator: "green",
+							});
+							frappe.set_route(`/app/checked-in/${encodeURIComponent(r.message)}`);
+						}
+					},
+				});
+			},
+		});
+
+		// Auto-fill room rate when rate type is selected
+		d.fields_dict["rate_type"].$input.on("change", () => {
+			const rate_type = d.get_value("rate_type");
+			if (!rate_type) return;
+
+			frappe.db.get_doc("Rate Type", rate_type).then(rate => {
+				let resolved = null;
+				const today = frappe.datetime.get_today();
+
+				if (rate.rate_schedule && rate.rate_schedule.length) {
+					for (const row of rate.rate_schedule) {
+						const type_match = !row.room_type || row.room_type === room.room_type;
+						const in_range   = (!row.from_date || row.from_date <= today) &&
+						                   (!row.to_date   || row.to_date   >= today);
+						if (type_match && in_range && row.rate) {
+							resolved = row.rate;
+							break;
+						}
+					}
+				}
+
+				if (!resolved && rate.base_rate) resolved = rate.base_rate;
+				if (resolved) d.set_value("room_rate", resolved);
+			});
+		});
+
+		d.show();
 	}
 }

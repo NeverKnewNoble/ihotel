@@ -24,10 +24,17 @@
   "section_break_identity",
   "id_type",
   "id_number",
+  "id_scan",
   "column_break_identity",
   "loyalty_tier",
   "section_break_address",
-  "address",
+  "city",
+  "address_line_1",
+  "column_break_gaug",
+  "state",
+  "address_line_2",
+  "column_break_zzxz",
+  "postal_code",
   "section_break_restricted",
   "restricted",
   "restriction_note",
@@ -57,9 +64,10 @@
   {
    "fieldname": "guest_name",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Guest Name",
-   "unique": 1,
-   "reqd": 1
+   "reqd": 1,
+   "unique": 1
   },
   {
    "fieldname": "section_break_jpeh",
@@ -141,6 +149,11 @@
    "label": "ID Number"
   },
   {
+   "fieldname": "id_scan",
+   "fieldtype": "Attach Image",
+   "label": "ID Scan"
+  },
+  {
    "fieldname": "column_break_identity",
    "fieldtype": "Column Break"
   },
@@ -156,20 +169,15 @@
    "label": "Address"
   },
   {
-   "fieldname": "address",
-   "fieldtype": "Text",
-   "label": "Address"
-  },
-  {
    "fieldname": "section_break_restricted",
    "fieldtype": "Section Break"
   },
   {
+   "bold": 1,
    "default": "0",
    "fieldname": "restricted",
    "fieldtype": "Check",
-   "label": "Restricted Guest",
-   "bold": 1
+   "label": "Restricted Guest"
   },
   {
    "depends_on": "eval:doc.restricted == 1",
@@ -232,12 +240,45 @@
    "fieldtype": "Date",
    "label": "Last Stay Date",
    "read_only": 1
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "label": "City"
+  },
+  {
+   "fieldname": "address_line_1",
+   "fieldtype": "Data",
+   "label": "Address Line 1"
+  },
+  {
+   "fieldname": "column_break_gaug",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "state",
+   "fieldtype": "Data",
+   "label": "State"
+  },
+  {
+   "fieldname": "address_line_2",
+   "fieldtype": "Data",
+   "label": "Address Line 2"
+  },
+  {
+   "fieldname": "column_break_zzxz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "postal_code",
+   "fieldtype": "Data",
+   "label": "Postal Code"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-19 00:00:00.000000",
+ "modified": "2026-03-20 09:21:10.318540",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Guest",
@@ -245,16 +286,55 @@
  "owner": "Administrator",
  "permissions": [
   {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
-   "read": 1,
    "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
+   "share": 1
+  },
+  {
+   "role": "General Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Front Desk Agent",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Revenue Manager",
+   "read": 1,
+   "export": 1,
+   "report": 1
+  },
+  {
+   "role": "Housekeeping Supervisor",
+   "read": 1
+  },
+  {
+   "role": "Hotel Accountant",
+   "read": 1,
+   "export": 1,
+   "report": 1
   }
  ],
  "row_format": "Dynamic",

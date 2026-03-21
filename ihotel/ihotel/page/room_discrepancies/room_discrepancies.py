@@ -19,7 +19,7 @@ def get_discrepancies():
 
 	# Get all active (checked-in) stays mapped by room
 	active_stays = frappe.db.get_all(
-		"Check In",
+		"Checked In",
 		filters={"status": "Checked In", "docstatus": 1},
 		fields=["name", "room", "guest"],
 	)

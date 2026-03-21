@@ -1,23 +1,38 @@
 import frappe
+from frappe import _
+from frappe.utils import now_datetime, flt
 
 
 @frappe.whitelist()
 def get_room_board_data():
-	"""Return all rooms with current status, guest info, and stay info."""
+	"""Return all rooms with current status, guest info, stay info, and rack rate."""
 	rooms = frappe.get_all(
 		"Room",
 		fields=["name", "room_number", "room_type", "floor", "status"],
 		order_by="room_number asc",
 	)
 
+	# Fetch rack rates from Room Type in one query
+	rack_rates = {}
+	if rooms:
+		room_types = list({r["room_type"] for r in rooms if r["room_type"]})
+		if room_types:
+			rates = frappe.get_all(
+				"Room Type",
+				filters={"name": ["in", room_types]},
+				fields=["name", "rack_rate"],
+			)
+			rack_rates = {r.name: r.rack_rate for r in rates}
+
 	for room in rooms:
 		room["guest"] = None
 		room["stay"] = None
 		room["check_out"] = None
+		room["rack_rate"] = rack_rates.get(room["room_type"], 0)
 
-		if room["status"] == "Occupied":
+		if room["status"] in ("Occupied", "Reserved"):
 			stay = frappe.db.get_value(
-				"Check In",
+				"Checked In",
 				filters={
 					"room": room["name"],
 					"status": ["in", ["Reserved", "Checked In"]],
@@ -32,3 +47,25 @@ def get_room_board_data():
 				room["check_out"] = stay.expected_check_out
 
 	return rooms
+
+
+@frappe.whitelist()
+def quick_check_in(room, guest, expected_check_in, expected_check_out, room_rate, rate_type=None):
+	"""Create and submit a Checked In document directly from the Room Board."""
+	room_doc = frappe.get_doc("Room", room)
+
+	doc = frappe.get_doc({
+		"doctype": "Checked In",
+		"guest": guest,
+		"room": room,
+		"room_type": room_doc.room_type,
+		"expected_check_in": expected_check_in,
+		"actual_check_in": now_datetime(),
+		"expected_check_out": expected_check_out,
+		"room_rate": flt(room_rate),
+		"rate_type": rate_type or None,
+		"status": "Checked In",
+	})
+	doc.insert(ignore_permissions=True)
+	doc.submit()
+	return doc.name

@@ -3,16 +3,22 @@
 
 frappe.ui.form.on("Reservation", {
 	refresh(frm) {
-		// Room filter by room_type
+		// Restrict date pickers to today or later for new documents
+		if (frm.is_new()) {
+			frm.set_df_property("check_in_date",  "options", { minDate: frappe.datetime.get_today() });
+			frm.set_df_property("check_out_date", "options", { minDate: frappe.datetime.get_today() });
+		}
+
+		// Room filter by room_type, excluding permanently unavailable rooms
 		frm.set_query("room", function () {
-			let filters = {};
+			let filters = { status: ["not in", ["Out of Order", "Out of Service"]] };
 			if (frm.doc.room_type) filters["room_type"] = frm.doc.room_type;
 			return { filters };
 		});
 
 		// Convert to Check In button
 		if (!frm.is_new() && frm.doc.status !== "cancelled" && !frm.doc.hotel_stay) {
-			frm.add_custom_button(__("Convert to Check In"), function () {
+			frm.add_custom_button(__("Convert to Checked In"), function () {
 				frappe.call({
 					method: "ihotel.ihotel.doctype.reservation.reservation.convert_to_hotel_stay",
 					args: { reservation_name: frm.doc.name },
@@ -47,8 +53,8 @@ frappe.ui.form.on("Reservation", {
 		// Intro: linked Check In
 		if (frm.doc.hotel_stay) {
 			frm.set_intro(
-				__("Converted to Check In: {0}", [
-					`<a href="/app/check-in/${frm.doc.hotel_stay}">${frm.doc.hotel_stay}</a>`
+				__("Converted to Checked In: {0}", [
+					`<a href="/app/checked-in/${frm.doc.hotel_stay}">${frm.doc.hotel_stay}</a>`
 				]),
 				"green"
 			);
@@ -120,6 +126,13 @@ frappe.ui.form.on("Reservation", {
 		let other      = frm.doc.other_charges || 0;
 		frm.set_value("total_rental",  total_rent + tax);
 		frm.set_value("total_charges", total_rent + tax + other - discount);
+	},
+
+	color(frm) {
+		// Live-preview the color indicator in the form header
+		if (frm.doc.color) {
+			frm.page.set_indicator(frm.doc.status || "", frm.doc.color);
+		}
 	},
 
 	rate_type(frm) {

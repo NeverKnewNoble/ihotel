@@ -13,10 +13,10 @@ def execute(filters=None):
 def get_columns():
 	return [
 		{"label": "Guest", "fieldname": "guest", "fieldtype": "Link", "options": "Guest", "width": 150},
-		{"label": "Stay", "fieldname": "stay", "fieldtype": "Link", "options": "Check In", "width": 120},
+		{"label": "Stay", "fieldname": "stay", "fieldtype": "Link", "options": "Checked In", "width": 120},
 		{"label": "Room", "fieldname": "room", "fieldtype": "Link", "options": "Room", "width": 100},
 		{"label": "Room Type", "fieldname": "room_type", "fieldtype": "Link", "options": "Room Type", "width": 120},
-		{"label": "Check In", "fieldname": "check_in", "fieldtype": "Datetime", "width": 160},
+		{"label": "Checked In", "fieldname": "check_in", "fieldtype": "Datetime", "width": 160},
 		{"label": "Check Out", "fieldname": "check_out", "fieldtype": "Datetime", "width": 160},
 		{"label": "Nights", "fieldname": "nights", "fieldtype": "Int", "width": 80},
 		{"label": "Total Amount", "fieldname": "total_amount", "fieldtype": "Currency", "width": 130},
@@ -45,7 +45,7 @@ def get_data(filters):
 			hs.nights,
 			hs.total_amount,
 			hs.status
-		FROM `tabCheck In` hs
+		FROM `tabChecked In` hs
 		WHERE {where}
 		ORDER BY hs.guest, hs.expected_check_in DESC
 	""", values, as_dict=True)

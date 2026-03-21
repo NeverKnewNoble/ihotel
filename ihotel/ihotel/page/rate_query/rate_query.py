@@ -57,7 +57,7 @@ def get_rate_query_data(arrival_date, nights, adults=1, children=0):
 		# Rooms with overlapping Check Ins
 		ci_occupied = frappe.db.sql("""
 			SELECT COUNT(DISTINCT room) AS cnt
-			FROM `tabCheck In`
+			FROM `tabChecked In`
 			WHERE room_type = %s
 			  AND status NOT IN ('Checked Out', 'Cancelled')
 			  AND DATE(expected_check_in) < %s

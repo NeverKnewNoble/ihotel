@@ -1,33 +1,44 @@
 # Copyright (c) 2025, Noble and contributors
 # For license information, please see license.txt
 
-# import frappe
+import frappe
 from frappe.model.document import Document
-from frappe.utils import flt
+from frappe.utils import flt, nowdate
 
 
 class iHotelProfile(Document):
-	"""DocType logic for keeping the hotel profile financial summary in sync."""
-
 	def validate(self):
-		"""Ensure summary fields stay aligned with the child payment table."""
-		self.update_financial_summary()
+		self.recalculate_amounts()
+		self.update_status()
 
-	def update_financial_summary(self):
-		"""Aggregate payment rows into total charges, payments, and outstanding."""
-		total_charges = 0.0
-		total_payments = 0.0
-		outstanding_balance = 0.0
+	def recalculate_amounts(self):
+		"""Sum charges and payments separately; derive outstanding balance."""
+		self.total_amount = round(
+			sum(flt(r.amount) for r in self.get("charges", [])), 2
+		)
+		self.total_payments = round(
+			sum(flt(r.rate) for r in self.get("payments", [])), 2
+		)
+		self.outstanding_balance = round(
+			self.total_amount - self.total_payments, 2
+		)
 
-		for row in self.get("payments", []):
-			amount = flt(row.rate)
-			total_charges += amount
+	def update_status(self):
+		"""Auto-set status to Settled when fully paid."""
+		if self.status == "Open" and self.outstanding_balance <= 0 and self.total_amount > 0:
+			self.status = "Settled"
 
-			if (row.payment_status or "").strip().lower() == "paid":
-				total_payments += amount
-			else:
-				outstanding_balance += amount
-
-		self.total_amount = total_charges
-		self.total_payments = total_payments
-		self.outstanding_balance = outstanding_balance
+	def post_charge(self, charge_type, description, rate, quantity=1,
+	                reference_doctype=None, reference_name=None):
+		"""Append a charge line to this folio and save."""
+		self.append("charges", {
+			"charge_date": nowdate(),
+			"charge_type": charge_type,
+			"description": description,
+			"quantity": quantity,
+			"rate": flt(rate),
+			"amount": round(flt(rate) * flt(quantity), 2),
+			"reference_doctype": reference_doctype or "",
+			"reference_name": reference_name or "",
+		})
+		self.save(ignore_permissions=True)

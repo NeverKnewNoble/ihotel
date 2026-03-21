@@ -4,22 +4,42 @@
 import frappe
 from frappe.model.document import Document
 from frappe import _
-from frappe.utils import getdate, date_diff, cint
+from frappe.utils import getdate, date_diff, cint, flt
 
 
 class GroupReservation(Document):
 	def validate(self):
 		self.validate_dates()
 		self.calculate_days()
+		self.calculate_revenue()
+		self.validate_rooming_list()
 
 	def validate_dates(self):
 		if self.check_in_date and self.check_out_date:
 			if getdate(self.check_in_date) >= getdate(self.check_out_date):
 				frappe.throw(_("Check-in date must be before check-out date"))
 
+		if self.cutoff_date and self.check_in_date:
+			if getdate(self.cutoff_date) > getdate(self.check_in_date):
+				frappe.throw(_("Room block cutoff date cannot be after check-in date"))
+
 	def calculate_days(self):
 		if self.check_in_date and self.check_out_date:
 			self.days = date_diff(self.check_out_date, self.check_in_date)
+
+	def calculate_revenue(self):
+		if self.days and self.no_of_rooms and self.rate_per_night:
+			self.total_room_revenue = flt(self.days) * flt(self.no_of_rooms) * flt(self.rate_per_night)
+
+	def validate_rooming_list(self):
+		if self.rooming_list and len(self.rooming_list) > cint(self.no_of_rooms or 0):
+			frappe.throw(_(
+				"Rooming list has {0} entries but only {1} room(s) are reserved."
+			).format(len(self.rooming_list), self.no_of_rooms))
+
+	def on_submit(self):
+		if self.status == "Tentative":
+			self.db_set("status", "Confirmed")
 
 
 @frappe.whitelist()
@@ -46,6 +66,8 @@ def generate_reservations(group_reservation_name):
 			"check_in_time": group.check_in_time,
 			"check_out_time": group.check_out_time,
 			"room_type": group.room_type,
+			"rate_type": group.rate_type,
+			"rent": group.rate_per_night,
 			"business_source_category": group.business_source_category,
 			"full_name": group.full_name,
 			"company": group.company,

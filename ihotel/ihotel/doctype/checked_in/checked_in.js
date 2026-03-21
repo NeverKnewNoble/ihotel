@@ -1,7 +1,7 @@
 // Copyright (c) 2025, Noble and contributors
 // For license information, please see license.txt
 
-frappe.ui.form.on("Check In", {
+frappe.ui.form.on("Checked In", {
 	onload: function(frm) {
 		setup_room_query(frm);
 		setup_rate_type_query(frm);
@@ -11,12 +11,51 @@ frappe.ui.form.on("Check In", {
 		setup_room_query(frm);
 		setup_rate_type_query(frm);
 
+		// Restrict date pickers to today or later for new documents
+		if (frm.is_new()) {
+			const today = frappe.datetime.get_today();
+			frm.set_df_property("expected_check_in",  "options", { minDate: today });
+			frm.set_df_property("expected_check_out", "options", { minDate: today });
+		}
+
+		// Folio button (only on submitted docs)
+		if (frm.doc.docstatus === 1) {
+			if (frm.doc.profile) {
+				frm.add_custom_button(__("Open Folio"), function() {
+					frappe.set_route("Form", "iHotel Profile", frm.doc.profile);
+				}, __("Billing"));
+			} else {
+				frm.add_custom_button(__("Create Folio"), function() {
+					frappe.call({
+						method: "ihotel.ihotel.doctype.checked_in.checked_in.create_folio",
+						args: { checked_in_name: frm.doc.name },
+						callback(r) {
+							if (r.message) {
+								frm.reload_doc();
+								frappe.set_route("Form", "iHotel Profile", r.message);
+							}
+						},
+					});
+				}, __("Billing"));
+			}
+		}
+
 		// Add custom buttons based on status
 		if (frm.doc.status === "Reserved" && !frm.is_new()) {
-			frm.add_custom_button(__("Check In"), function() {
+			frm.add_custom_button(__("Checked In"), function() {
 				frm.set_value("status", "Checked In");
 				frm.set_value("actual_check_in", frappe.datetime.now_datetime());
 				frm.save();
+			}).addClass("btn-primary");
+
+			frm.add_custom_button(__("No Show"), function() {
+				frappe.confirm(
+					__("Mark this reservation as No Show? This will free the room."),
+					function() {
+						frm.set_value("status", "No Show");
+						frm.save();
+					}
+				);
 			});
 		}
 
@@ -49,12 +88,76 @@ frappe.ui.form.on("Check In", {
 			);
 
 			frm.add_custom_button(__("Check Out"), function() {
-				frm.set_value("status", "Checked Out");
-				frm.set_value("actual_check_out", frappe.datetime.now_datetime());
-				frm.save();
+				const do_checkout = () => {
+					frm.set_value("status", "Checked Out");
+					frm.set_value("actual_check_out", frappe.datetime.now_datetime());
+					frm.save();
+				};
+				if (frm.doc.profile) {
+					frappe.db.get_value("iHotel Profile", frm.doc.profile,
+						["outstanding_balance"])
+					.then(r => {
+						const bal = r.message && parseFloat(r.message.outstanding_balance || 0);
+						if (bal > 0) {
+							frappe.confirm(
+								__("Folio has an outstanding balance of {0}. Check out anyway?",
+									[format_currency(bal)]),
+								do_checkout
+							);
+						} else {
+							do_checkout();
+						}
+					});
+				} else {
+					do_checkout();
+				}
 			});
 
-			frm.add_custom_button(__("Room Move"), function() {
+			frm.add_custom_button(__("Extend Stay"), function() {
+			const d = new frappe.ui.Dialog({
+				title: __("Extend Stay"),
+				fields: [
+					{
+						fieldtype: "Data",
+						fieldname: "current_checkout",
+						label: __("Current Checkout"),
+						default: frm.doc.expected_check_out || __("(none)"),
+						read_only: 1,
+					},
+					{
+						fieldtype: "Datetime",
+						fieldname: "new_checkout",
+						label: __("New Checkout Date/Time"),
+						reqd: 1,
+					},
+					{
+						fieldtype: "Small Text",
+						fieldname: "reason",
+						label: __("Reason (optional)"),
+					},
+				],
+				primary_action_label: __("Extend"),
+				primary_action(values) {
+					frappe.call({
+						method: "ihotel.ihotel.doctype.checked_in.checked_in.extend_stay",
+						args: {
+							checked_in_name: frm.doc.name,
+							new_checkout: values.new_checkout,
+							reason: values.reason || "",
+						},
+						callback(r) {
+							if (r.message) {
+								d.hide();
+								frm.reload_doc();
+							}
+						},
+					});
+				},
+			});
+			d.show();
+		}, __("Actions"));
+
+		frm.add_custom_button(__("Room Move"), function() {
 				const d = new frappe.ui.Dialog({
 					title: __("Move Guest to Another Room"),
 					fields: [
@@ -84,7 +187,7 @@ frappe.ui.form.on("Check In", {
 					primary_action_label: __("Confirm Move"),
 					primary_action(values) {
 						frappe.call({
-							method: "ihotel.ihotel.doctype.check_in.check_in.move_room",
+							method: "ihotel.ihotel.doctype.checked_in.checked_in.move_room",
 							args: {
 								check_in_name: frm.doc.name,
 								new_room: values.new_room,
@@ -162,20 +265,18 @@ frappe.ui.form.on("Check In", {
 		frm.trigger("calculate_total");
 	},
 
-	// Calculate dates from nights field
+	// Calculate check-out from nights (user typed nights directly)
 	nights(frm) {
-		if (frm.doc.nights && frm.doc.nights > 0) {
-			// If expected_check_in is not set, set it to current date/time
-			if (!frm.doc.expected_check_in) {
-				frm.set_value("expected_check_in", frappe.datetime.now_datetime());
-			}
-
-			// Calculate expected_check_out from expected_check_in + nights
-			if (frm.doc.expected_check_in) {
-				const check_in = frappe.datetime.str_to_obj(frm.doc.expected_check_in);
-				const check_out = new Date(check_in);
-				check_out.setDate(check_out.getDate() + frm.doc.nights);
-				frm.set_value("expected_check_out", frappe.datetime.obj_to_str(check_out));
+		if (frm.doc.nights && frm.doc.nights > 0 && frm.doc.expected_check_in) {
+			const check_in = frappe.datetime.str_to_obj(frm.doc.expected_check_in);
+			const check_out = new Date(check_in);
+			check_out.setDate(check_out.getDate() + frm.doc.nights);
+			// Use doc + refresh to avoid re-triggering expected_check_out event
+			frm.doc.expected_check_out = frappe.datetime.obj_to_str(check_out);
+			frm.refresh_field("expected_check_out");
+			if (frm.doc.room_rate) {
+				frm.doc.total_amount = frm.doc.nights * frm.doc.room_rate;
+				frm.refresh_field("total_amount");
 			}
 		}
 	},
@@ -222,6 +323,12 @@ frappe.ui.form.on("Check In", {
 		});
 	},
 
+	color(frm) {
+		if (frm.doc.color) {
+			frm.page.set_indicator(frm.doc.status || "", frm.doc.color);
+		}
+	},
+
 	calculate_total(frm) {
 		if (frm.doc.expected_check_in && frm.doc.expected_check_out && frm.doc.room_rate) {
 			const nights = frappe.datetime.get_day_diff(
@@ -229,8 +336,11 @@ frappe.ui.form.on("Check In", {
 				frm.doc.expected_check_in
 			);
 			if (nights > 0) {
-				frm.set_value("nights", nights);
-				frm.set_value("total_amount", nights * frm.doc.room_rate);
+				// Use doc + refresh to avoid triggering the nights event handler
+				frm.doc.nights = nights;
+				frm.refresh_field("nights");
+				frm.doc.total_amount = nights * frm.doc.room_rate;
+				frm.refresh_field("total_amount");
 			}
 		}
 	}
@@ -251,7 +361,7 @@ function setup_rate_type_query(frm) {
 	frm.set_query("rate_type", function() {
 		if (frm.doc.room_type) {
 			return {
-				query: "ihotel.ihotel.doctype.check_in.check_in.get_rate_types_for_room_type",
+				query: "ihotel.ihotel.doctype.checked_in.checked_in.get_rate_types_for_room_type",
 				filters: { room_type: frm.doc.room_type },
 			};
 		}
@@ -264,7 +374,7 @@ function setup_room_query(frm) {
 	frm.set_query("room", function() {
 		if (frm.doc.room_type) {
 			return {
-				query: "ihotel.ihotel.doctype.check_in.check_in.get_rooms_for_room_type",
+				query: "ihotel.ihotel.doctype.checked_in.checked_in.get_rooms_for_room_type",
 				filters: { room_type: frm.doc.room_type },
 			};
 		}

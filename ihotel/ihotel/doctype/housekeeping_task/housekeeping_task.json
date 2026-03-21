@@ -10,11 +10,15 @@
   "status",
   "column_break_xgpq",
   "task_type",
+  "priority",
   "assigned_to",
   "section_break_qngq",
   "assigned_date",
+  "estimated_duration",
   "column_break_hqzo",
-  "cleaned_date",
+  "actual_start_time",
+  "actual_end_time",
+  "completed_by",
   "section_break_dcoy",
   "notes",
   "instructions_section",
@@ -49,6 +53,14 @@
    "options": "Check-out Cleaning\nStay Over Cleaning\nDeep Cleaning\nMaintenance Cleaning\nTurndown"
   },
   {
+   "default": "Normal",
+   "fieldname": "priority",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Priority",
+   "options": "Low\nNormal\nHigh\nUrgent"
+  },
+  {
    "fieldname": "assigned_to",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -57,7 +69,8 @@
   },
   {
    "fieldname": "section_break_qngq",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Timing"
   },
   {
    "fieldname": "assigned_date",
@@ -65,8 +78,30 @@
    "label": "Assigned Date"
   },
   {
+   "description": "Expected minutes to complete",
+   "fieldname": "estimated_duration",
+   "fieldtype": "Int",
+   "label": "Est. Duration (min)"
+  },
+  {
    "fieldname": "column_break_hqzo",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "actual_start_time",
+   "fieldtype": "Datetime",
+   "label": "Actual Start Time"
+  },
+  {
+   "fieldname": "actual_end_time",
+   "fieldtype": "Datetime",
+   "label": "Actual End Time"
+  },
+  {
+   "fieldname": "completed_by",
+   "fieldtype": "Link",
+   "label": "Completed By",
+   "options": "User"
   },
   {
    "fieldname": "cleaned_date",
@@ -113,16 +148,45 @@
  "owner": "Administrator",
  "permissions": [
   {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
-   "read": 1,
    "report": 1,
-   "role": "System Manager",
-   "share": 1,
+   "share": 1
+  },
+  {
+   "role": "General Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Housekeeping Staff",
+   "read": 1,
    "write": 1
+  },
+  {
+   "role": "Housekeeping Supervisor",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
   }
  ],
  "row_format": "Dynamic",

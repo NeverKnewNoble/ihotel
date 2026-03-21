@@ -19,6 +19,8 @@
   "occupied_rooms",
   "column_break_sqnr",
   "occupancy_rate",
+  "adr",
+  "revpar",
   "section_break_dbgv",
   "audit_notes"
  ],
@@ -67,6 +69,20 @@
    "label": "Occupancy Rate"
   },
   {
+   "fieldname": "adr",
+   "fieldtype": "Currency",
+   "label": "ADR",
+   "read_only": 1,
+   "description": "Average Daily Rate"
+  },
+  {
+   "fieldname": "revpar",
+   "fieldtype": "Currency",
+   "label": "RevPAR",
+   "read_only": 1,
+   "description": "Revenue Per Available Room"
+  },
+  {
    "default": "0.00",
    "fieldname": "total_revenue",
    "fieldtype": "Currency",
@@ -109,16 +125,51 @@
  "owner": "Administrator",
  "permissions": [
   {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
-   "read": 1,
    "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
+   "share": 1
+  },
+  {
+   "role": "General Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Front Desk Agent",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Hotel Accountant",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
   }
  ],
  "row_format": "Dynamic",

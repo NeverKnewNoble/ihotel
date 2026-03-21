@@ -47,7 +47,7 @@ class MaintenanceRequest(Document):
 				"name": ["!=", self.name],
 			})
 			if not other_open:
-				active_stay = frappe.db.exists("Check In", {
+				active_stay = frappe.db.exists("Checked In", {
 					"room": self.room,
 					"status": ["in", ["Reserved", "Checked In"]],
 					"docstatus": 1,

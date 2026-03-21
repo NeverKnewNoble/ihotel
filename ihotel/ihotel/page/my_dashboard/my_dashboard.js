@@ -71,21 +71,27 @@ class IHotelDashboard {
 
 			<!-- KPI Cards -->
 			<div class="ih-kpi-grid">
-				${this.kpi_card("Occupancy Rate", d.occupancy_rate + "%",
+				${this.kpi_card("Occupancy", d.occupancy_rate + "%",
 					d.occupied_rooms + " of " + d.total_rooms + " rooms", "blue",
 					'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>')}
-				${this.kpi_card("Today's Revenue", format_currency(d.todays_revenue),
-					"From checked-in stays", "green",
+				${this.kpi_card("In-House", d.in_house_count,
+					"Guests currently checked in", "teal",
+					'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')}
+				${this.kpi_card("Tonight's Revenue", format_currency(d.todays_revenue),
+					"Nightly room rates, in-house stays", "green",
 					'<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>')}
-				${this.kpi_card("Available Rooms", d.available_rooms,
-					"Ready for guests", "teal",
-					'<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>')}
-				${this.kpi_card("Today's Check-ins", d.todays_checkins,
-					d.todays_checkouts + " check-outs expected", "amber",
-					'<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>')}
+				${this.kpi_card("Arrivals Today", d.arrivals_today,
+					d.departures_today + " departure(s) expected", "amber",
+					'<path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/>')}
+				${this.kpi_card("ADR", format_currency(d.adr),
+					"Average Daily Rate (in-house)", "teal",
+					'<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>')}
+				${this.kpi_card("RevPAR", format_currency(d.revpar),
+					"Revenue Per Available Room", "blue",
+					'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/>')}
 			</div>
 
-			<!-- Room Status + Active Stays -->
+			<!-- Room Status + Operations -->
 			<div class="ih-section-grid">
 				<!-- Room Status -->
 				<div class="ih-card">
@@ -96,8 +102,9 @@ class IHotelDashboard {
 					<div class="ih-card-body">
 						<div id="ih-room-chart" class="ih-chart-container"></div>
 						<div class="ih-status-bars" style="margin-top: 16px;">
-							${this.status_bar("Available", d.room_status.Available, d.total_rooms, "available")}
-							${this.status_bar("Occupied", d.room_status.Occupied, d.total_rooms, "occupied")}
+							${this.status_bar("Available",    d.room_status.Available,    d.total_rooms, "available")}
+							${this.status_bar("Occupied",     d.room_status.Occupied,     d.total_rooms, "occupied")}
+							${this.status_bar("Dirty",        d.room_status.Dirty,        d.total_rooms, "dirty")}
 							${this.status_bar("Housekeeping", d.room_status.Housekeeping, d.total_rooms, "housekeeping")}
 							${this.status_bar("Out of Order", d.room_status["Out of Order"], d.total_rooms, "out-of-order")}
 						</div>
@@ -121,9 +128,9 @@ class IHotelDashboard {
 								Housekeeping
 							</div>
 							<div class="ih-ops-items">
-								${this.ops_item("Pending", d.housekeeping.Pending, "pending")}
-								${this.ops_item("In Progress", d.housekeeping["In Progress"], "in-progress")}
-								${this.ops_item("Completed", d.housekeeping.Completed, "completed")}
+								${this.ops_item("Pending",     d.housekeeping.Pending,        "pending")}
+								${this.ops_item("In Progress", d.housekeeping["In Progress"],  "in-progress")}
+								${this.ops_item("Completed",   d.housekeeping.Completed,       "completed")}
 							</div>
 						</div>
 						<!-- Maintenance -->
@@ -136,10 +143,10 @@ class IHotelDashboard {
 								Maintenance
 							</div>
 							<div class="ih-ops-items">
-								${this.ops_item("Open", d.maintenance.Open, "open")}
-								${this.ops_item("In Progress", d.maintenance["In Progress"], "in-progress")}
-								${this.ops_item("Resolved", d.maintenance.Resolved, "resolved")}
-								${this.ops_item("Closed", d.maintenance.Closed, "closed")}
+								${this.ops_item("Open",        d.maintenance.Open,            "open")}
+								${this.ops_item("In Progress", d.maintenance["In Progress"],   "in-progress")}
+								${this.ops_item("Resolved",    d.maintenance.Resolved,         "resolved")}
+								${this.ops_item("Closed",      d.maintenance.Closed,           "closed")}
 							</div>
 							${d.critical_maintenance > 0 ? `
 							<div class="ih-critical">
@@ -159,7 +166,7 @@ class IHotelDashboard {
 				<div class="ih-card">
 					<div class="ih-card-header">
 						<div class="ih-card-title">Active Stays</div>
-						<a class="ih-card-link" href="/app/check-in?status=%5B%22in%22%2C%5B%22Reserved%22%2C%22Checked%20In%22%5D%5D&docstatus=1">View All</a>
+						<a class="ih-card-link" href="/app/checked-in?status=%5B%22in%22%2C%5B%22Reserved%22%2C%22Checked%20In%22%5D%5D&docstatus=1">View All</a>
 					</div>
 					<div class="ih-card-body" style="padding: 0;">
 						${this.render_stays_table(d.active_stays)}
@@ -241,22 +248,24 @@ class IHotelDashboard {
 		}
 		let rows = stays.map((s) => {
 			const badge_cls = s.status === "Checked In" ? "checked" : "reserved";
-			const checkin = s.expected_check_in ? frappe.datetime.str_to_user(s.expected_check_in) : "-";
+			const checkin  = s.expected_check_in  ? frappe.datetime.str_to_user(s.expected_check_in)  : "-";
 			const checkout = s.expected_check_out ? frappe.datetime.str_to_user(s.expected_check_out) : "-";
 			return `<tr>
-				<td><a href="/app/check-in/${encodeURIComponent(s.name)}">${frappe.utils.escape_html(s.guest || s.name)}</a></td>
+				<td><a href="/app/checked-in/${encodeURIComponent(s.name)}">${frappe.utils.escape_html(s.guest || s.name)}</a></td>
 				<td>${frappe.utils.escape_html(s.room || "-")}</td>
+				<td>${frappe.utils.escape_html(s.room_type || "-")}</td>
 				<td><span class="ih-badge ${badge_cls}">${s.status}</span></td>
 				<td>${checkin}</td>
 				<td>${checkout}</td>
+				<td>${s.nights || "-"}</td>
 				<td>${format_currency(s.room_rate)}</td>
 			</tr>`;
 		}).join("");
 
 		return `<table class="ih-table">
 			<thead><tr>
-				<th>Guest</th><th>Room</th><th>Status</th>
-				<th>Check-in</th><th>Check-out</th><th>Rate</th>
+				<th>Guest</th><th>Room</th><th>Room Type</th><th>Status</th>
+				<th>Check-in</th><th>Check-out</th><th>Nights</th><th>Rate</th>
 			</tr></thead>
 			<tbody>${rows}</tbody>
 		</table>`;
@@ -274,13 +283,15 @@ class IHotelDashboard {
 				<td>${a.occupied_rooms || 0} / ${a.total_rooms || 0}</td>
 				<td>${(a.occupancy_rate || 0).toFixed(1)}%</td>
 				<td>${format_currency(a.total_revenue)}</td>
+				<td>${format_currency(a.adr)}</td>
+				<td>${format_currency(a.revpar)}</td>
 			</tr>`;
 		}).join("");
 
 		return `<table class="ih-table">
 			<thead><tr>
 				<th>Date</th><th>Rooms (Occ/Total)</th>
-				<th>Occupancy</th><th>Revenue</th>
+				<th>Occupancy</th><th>Revenue</th><th>ADR</th><th>RevPAR</th>
 			</tr></thead>
 			<tbody>${rows}</tbody>
 		</table>`;
@@ -292,24 +303,20 @@ class IHotelDashboard {
 		if (!chart_el) return;
 
 		const rs = d.room_status;
-		const has_data = (rs.Available + rs.Occupied + rs.Housekeeping + rs["Out of Order"]) > 0;
-
-		if (!has_data) {
+		const vals = [rs.Available, rs.Occupied, rs.Dirty, rs.Housekeeping, rs["Out of Order"]];
+		if (!vals.some(v => v > 0)) {
 			chart_el.innerHTML = '<div class="ih-empty">No room data</div>';
 			return;
 		}
 
-		// Use frappe.Chart (frappe-charts)
 		this.chart = new frappe.Chart(chart_el, {
 			data: {
-				labels: ["Available", "Occupied", "Housekeeping", "Out of Order"],
-				datasets: [{
-					values: [rs.Available, rs.Occupied, rs.Housekeeping, rs["Out of Order"]],
-				}],
+				labels: ["Available", "Occupied", "Dirty", "Housekeeping", "Out of Order"],
+				datasets: [{ values: vals }],
 			},
 			type: "donut",
-			height: 240,
-			colors: ["#10b981", "#3b82f6", "#f59e0b", "#ef4444"],
+			height: 220,
+			colors: ["#10b981", "#3b82f6", "#f97316", "#f59e0b", "#ef4444"],
 		});
 	}
 }

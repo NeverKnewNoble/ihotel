@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.utils import nowdate, now_datetime, add_days, get_datetime
 
 
@@ -9,7 +10,7 @@ def auto_no_show():
 	"""Mark Hotel Stay as No Show if Reserved and check-in was > 24h ago."""
 	cutoff = add_days(now_datetime(), -1)
 	stays = frappe.get_all(
-		"Check In",
+		"Checked In",
 		filters={
 			"status": "Reserved",
 			"docstatus": 1,
@@ -19,7 +20,7 @@ def auto_no_show():
 	)
 	for stay_name in stays:
 		try:
-			stay = frappe.get_doc("Check In", stay_name)
+			stay = frappe.get_doc("Checked In", stay_name)
 			stay.status = "No Show"
 			stay.save(ignore_permissions=True)
 			frappe.db.commit()
@@ -32,7 +33,7 @@ def late_checkout_alert():
 	"""Create Notification Log for stays past expected check-out."""
 	now = now_datetime()
 	stays = frappe.get_all(
-		"Check In",
+		"Checked In",
 		filters={
 			"status": "Checked In",
 			"docstatus": 1,
@@ -43,7 +44,7 @@ def late_checkout_alert():
 	for stay in stays:
 		# Avoid duplicate notifications
 		existing = frappe.db.exists("Notification Log", {
-			"document_type": "Check In",
+			"document_type": "Checked In",
 			"document_name": stay.name,
 			"subject": ["like", "%late checkout%"],
 		})
@@ -52,7 +53,7 @@ def late_checkout_alert():
 				"doctype": "Notification Log",
 				"for_user": "Administrator",
 				"type": "Alert",
-				"document_type": "Check In",
+				"document_type": "Checked In",
 				"document_name": stay.name,
 				"subject": f"Late checkout: {stay.guest or ''} in room {stay.room or ''} "
 				           f"(expected {stay.expected_check_out})",
@@ -84,6 +85,86 @@ def auto_generate_housekeeping():
 				}).insert(ignore_permissions=True)
 			except Exception:
 				frappe.log_error(f"Error creating housekeeping task for room {room_name}")
+	frappe.db.commit()
+
+
+def send_birthday_notifications():
+	"""Send birthday emails to guests whose birthday is today and notify staff."""
+	from frappe.utils import getdate, nowdate
+
+	# Check settings toggles
+	send_email = True
+	send_staff_alert = True
+	hotel_name = "iHotel"
+	try:
+		settings = frappe.get_single("iHotel Settings")
+		send_email = bool(settings.get("send_birthday_email", 1))
+		send_staff_alert = bool(settings.get("send_birthday_staff_alert", 1))
+		hotel_name = settings.hotel_name or hotel_name
+	except Exception:
+		pass
+
+	today = getdate(nowdate())
+	month = today.month
+	day = today.day
+
+	guests = frappe.db.sql("""
+		SELECT name, guest_name, email, marketing_opt_out
+		FROM `tabGuest`
+		WHERE date_of_birth IS NOT NULL
+		AND MONTH(date_of_birth) = %s
+		AND DAY(date_of_birth) = %s
+	""", (month, day), as_dict=True)
+
+	for guest in guests:
+		# --- Staff notification ---
+		already_notified = frappe.db.exists("Notification Log", {
+			"document_type": "Guest",
+			"document_name": guest.name,
+			"subject": ["like", f"%Birthday%{today.year}%"],
+		})
+		if send_staff_alert and not already_notified:
+			frappe.get_doc({
+				"doctype": "Notification Log",
+				"for_user": "Administrator",
+				"type": "Alert",
+				"document_type": "Guest",
+				"document_name": guest.name,
+				"subject": f"Birthday ({today.year}): {guest.guest_name}",
+			}).insert(ignore_permissions=True)
+
+		# --- Guest email (only if toggle enabled, has email, and hasn't opted out) ---
+		if not send_email or not guest.email or guest.marketing_opt_out:
+			continue
+
+		try:
+			from ihotel.notifications import _email_wrapper
+			content = f"""
+<p style="margin:0 0 20px;font-size:16px;color:#212529;">
+  Dear <strong>{guest.guest_name}</strong>,
+</p>
+<p style="margin:0 0 24px;font-size:14px;color:#495057;line-height:1.6;">
+  On behalf of the entire team at {hotel_name}, we'd like to wish you a very
+  <strong>Happy Birthday!</strong> 🎂
+</p>
+<p style="margin:0 0 24px;font-size:14px;color:#495057;line-height:1.6;">
+  As a valued guest, you are very special to us. We hope this birthday brings you
+  joy, happiness, and wonderful memories. We look forward to welcoming you back soon.
+</p>
+<p style="margin:8px 0 0;font-size:14px;color:#495057;">
+  Warm regards,<br>
+  <strong>The {hotel_name} Team</strong>
+</p>"""
+			frappe.sendmail(
+				recipients=[guest.email],
+				subject=_("Happy Birthday from {0}!").format(hotel_name),
+				message=_email_wrapper(hotel_name, content),
+				reference_doctype="Guest",
+				reference_name=guest.name,
+			)
+		except Exception:
+			frappe.log_error(f"Error sending birthday email to guest {guest.name}")
+
 	frappe.db.commit()
 
 

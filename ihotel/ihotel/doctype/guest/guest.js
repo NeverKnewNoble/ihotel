@@ -27,8 +27,8 @@ frappe.ui.form.on("Guest", {
 		}, __("View"));
 
 		// New Reservation button
-		frm.add_custom_button(__("New Check In"), function () {
-			frappe.new_doc("Check In", { guest: frm.doc.name });
+		frm.add_custom_button(__("New Checked In"), function () {
+			frappe.new_doc("Checked In", { guest: frm.doc.name });
 		}, __("View"));
 
 		// Load stay statistics into the Stats tab

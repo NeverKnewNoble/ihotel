@@ -16,7 +16,7 @@ def get_turndown_data():
 
 	# All checked-in stays
 	stays = frappe.get_all(
-		"Check In",
+		"Checked In",
 		filters={"status": "Checked In", "docstatus": 1},
 		fields=["name", "guest", "room", "turndown_requested"],
 		order_by="room asc",
