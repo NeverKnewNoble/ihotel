@@ -36,12 +36,12 @@ class NightAudit(Document):
 
         # Get occupied rooms - count of checked-in stays
         # Status "Checked In" means the guest has checked in
-        occupied_stays = frappe.get_all("Check In",
+        occupied_stays = frappe.get_all("Checked In",
             filters={
                 "status": "Checked In",
                 "docstatus": 1
             },
-            fields=["name", "total_amount"])
+            fields=["name", "room_rate", "total_amount"])
 
         self.occupied_rooms = len(occupied_stays)
 
@@ -51,8 +51,14 @@ class NightAudit(Document):
         else:
             self.occupancy_rate = 0
 
-        # Calculate total revenue from checked-in stays
-        self.total_revenue = sum(stay.total_amount or 0 for stay in occupied_stays)
+        # Revenue = sum of nightly room rates (one night per in-house stay)
+        self.total_revenue = sum(stay.room_rate or 0 for stay in occupied_stays)
+
+        # ADR = revenue / occupied rooms
+        self.adr = round(self.total_revenue / self.occupied_rooms, 2) if self.occupied_rooms else 0
+
+        # RevPAR = revenue / total available rooms
+        self.revpar = round(self.total_revenue / self.total_rooms, 2) if self.total_rooms else 0
 
     def validate_audit_date(self):
         """
@@ -83,7 +89,7 @@ class NightAudit(Document):
         Only processes checked-in stays that are submitted.
         """
         occupied_stays = frappe.get_all(
-            "Check In",
+            "Checked In",
             filters={
                 "status": "Checked In",  # Match the status in JSON
                 "docstatus": 1
@@ -92,7 +98,7 @@ class NightAudit(Document):
         )
 
         for stay in occupied_stays:
-            stay_doc = frappe.get_doc("Check In", stay.name)
+            stay_doc = frappe.get_doc("Checked In", stay.name)
             profile_doc = self.ensure_profile_for_stay(stay_doc)
             self.add_payment_entry(profile_doc, stay_doc)
             # self.create_journal_entry(stay_doc)
@@ -128,13 +134,30 @@ class NightAudit(Document):
 
     def add_payment_entry(self, profile_doc, stay_doc):
         """
-        Append a nightly room charge into the profile payments table.
+        Append a nightly room charge to the folio charges table.
+        Skips if a room charge for today already exists (prevents duplicates).
         """
-        profile_doc.append("payments", {
-            "date": nowdate(),
+        today = nowdate()
+
+        # Duplicate guard: don't post twice for the same audit date
+        already_posted = any(
+            r.charge_date == today
+            and r.charge_type == "Room Charge"
+            and r.reference_name == stay_doc.name
+            for r in profile_doc.get("charges", [])
+        )
+        if already_posted:
+            return
+
+        profile_doc.append("charges", {
+            "charge_date": today,
+            "charge_type": "Room Charge",
+            "description": "Nightly room charge — Room {0}".format(stay_doc.room or ""),
+            "quantity": 1,
             "rate": stay_doc.room_rate or 0,
-            "detail": "Room Charge",
-            "payment_status": "Pending payment"
+            "amount": stay_doc.room_rate or 0,
+            "reference_doctype": "Checked In",
+            "reference_name": stay_doc.name,
         })
         profile_doc.save(ignore_permissions=True)
 
@@ -204,5 +227,7 @@ class NightAudit(Document):
             "total_rooms": self.total_rooms,
             "occupied_rooms": self.occupied_rooms,
             "occupancy_rate": self.occupancy_rate,
-            "total_revenue": self.total_revenue
+            "total_revenue": self.total_revenue,
+            "adr": self.adr,
+            "revpar": self.revpar,
         }

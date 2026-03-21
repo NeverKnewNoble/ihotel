@@ -2,6 +2,7 @@
  "actions": [],
  "allow_rename": 1,
  "creation": "2026-02-12 07:44:43.024107",
+ "default_view": "Calendar",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -16,13 +17,27 @@
   "contact_details_section",
   "email_address",
   "city",
+  "address_line_1",
   "column_break_gcyq",
   "phone_number",
   "state",
+  "address_line_2",
   "column_break_ulel",
   "country",
   "postal_code",
+  "section_break_jmqu",
+  "guest_id_type",
+  "column_break_imij",
+  "id_number",
   "stay_and_rent_details_tab",
+  "status_section",
+  "status",
+  "cancellation_reason",
+  "hotel_stay",
+  "column_break_status",
+  "color",
+  "cancellation_number",
+  "section_break_amte",
   "check_in_date",
   "check_in_time",
   "column_break_quex",
@@ -38,15 +53,17 @@
   "building",
   "column_break_bxqg",
   "adults",
-  "children",
   "market_segment",
+  "column_break_rxah",
+  "children",
   "business_source_category",
-  "status_section",
-  "status",
-  "hotel_stay",
-  "column_break_status",
-  "cancellation_reason",
-  "cancellation_number",
+  "requests_section",
+  "special_requests",
+  "comments",
+  "column_break_requests",
+  "eta",
+  "no_post",
+  "rate_details_tab",
   "rate_details_section",
   "rate_type",
   "section_break_hxvt",
@@ -59,12 +76,7 @@
   "total_rental",
   "deposit",
   "total_charges",
-  "requests_section",
-  "special_requests",
-  "comments",
-  "column_break_requests",
-  "eta",
-  "no_post",
+  "cancellation_fee",
   "guarantee_and_payment_tab",
   "guarantee_section",
   "guarantee_type",
@@ -75,7 +87,19 @@
   "column_break_walv",
   "credit_card_last4",
   "column_break_mvqd",
-  "card_expiry"
+  "card_expiry",
+  "section_break_gufu",
+  "guest_identification",
+  "cheque_number",
+  "column_break_dtml",
+  "bank_name",
+  "cheque_amount",
+  "column_break_zcsq",
+  "bank_account_no",
+  "date_of_the_cheque",
+  "section_break_ndhg",
+  "customer_id",
+  "amount"
  ],
  "fields": [
   {
@@ -142,7 +166,7 @@
   {
    "fieldname": "room",
    "fieldtype": "Link",
-   "label": "Room",
+   "label": "Room No.",
    "options": "Room"
   },
   {
@@ -250,6 +274,13 @@
    "read_only": 1
   },
   {
+   "depends_on": "eval:doc.status === 'cancelled'",
+   "fieldname": "cancellation_fee",
+   "fieldtype": "Currency",
+   "label": "Cancellation Fee",
+   "read_only": 1
+  },
+  {
    "fieldname": "guarantee_section",
    "fieldtype": "Section Break",
    "label": "Guarantee And Payment"
@@ -258,33 +289,33 @@
    "fieldname": "guarantee_type",
    "fieldtype": "Select",
    "label": "Guarantee Type",
-   "options": "\nCredit Card\nCompany\nDeposit\n6PM Courtesy Hold\nNo Guarantee"
+   "options": "\nIndividual\nCompany\nDeposit\n6PM Courtesy Hold\nNo Guarantee"
   },
   {
    "fieldname": "payment_method",
    "fieldtype": "Select",
    "label": "Payment Method",
-   "options": "\nVisa\nMastercard\nAmerican Express\nCash\nDirect Bill\nOther"
+   "options": "\nCredit Card\nCash\nCheque\nDirect Bill"
   },
   {
    "fieldname": "column_break_guarantee",
    "fieldtype": "Column Break"
   },
   {
-   "depends_on": "eval:['Visa','Mastercard','American Express'].includes(doc.payment_method)",
+   "depends_on": "eval:['Credit Card'].includes(doc.payment_method)",
    "fieldname": "credit_card_type",
    "fieldtype": "Select",
    "label": "Card Type",
    "options": "\nVisa\nMastercard\nAmerican Express\nOther"
   },
   {
-   "depends_on": "eval:['Visa','Mastercard','American Express'].includes(doc.payment_method)",
+   "depends_on": "eval:['Credit Card'].includes(doc.payment_method)",
    "fieldname": "credit_card_last4",
    "fieldtype": "Data",
    "label": "Card Last 4 Digits"
   },
   {
-   "depends_on": "eval:['Visa','Mastercard','American Express'].includes(doc.payment_method)",
+   "depends_on": "eval:['Credit Card'].includes(doc.payment_method)",
    "fieldname": "card_expiry",
    "fieldtype": "Data",
    "label": "Card Expiry (MM/YY)"
@@ -321,8 +352,7 @@
   },
   {
    "fieldname": "status_section",
-   "fieldtype": "Section Break",
-   "label": "Status"
+   "fieldtype": "Section Break"
   },
   {
    "fieldname": "status",
@@ -333,10 +363,15 @@
    "options": "pending\nconfirmed\ncancelled"
   },
   {
+   "fieldname": "color",
+   "fieldtype": "Color",
+   "label": "Calendar Color"
+  },
+  {
    "fieldname": "hotel_stay",
    "fieldtype": "Link",
    "label": "Check In Record",
-   "options": "Check In",
+   "options": "Checked In",
    "read_only": 1
   },
   {
@@ -375,6 +410,7 @@
    "label": "Personal Details"
   },
   {
+   "fetch_from": "guest.guest_name",
    "fieldname": "full_name",
    "fieldtype": "Data",
    "label": "Full Name"
@@ -384,6 +420,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "fetch_from": "guest.date_of_birth",
    "fieldname": "date_of_birth",
    "fieldtype": "Date",
    "label": "Date of Birth"
@@ -403,12 +440,14 @@
    "label": "Contact Details"
   },
   {
+   "fetch_from": "guest.email",
    "fieldname": "email_address",
    "fieldtype": "Data",
    "label": "Email Address",
    "options": "Email"
   },
   {
+   "fetch_from": "guest.city",
    "fieldname": "city",
    "fieldtype": "Data",
    "label": "City"
@@ -418,11 +457,13 @@
    "fieldtype": "Column Break"
   },
   {
+   "fetch_from": "guest.phone",
    "fieldname": "phone_number",
    "fieldtype": "Phone",
    "label": "Phone Number"
   },
   {
+   "fetch_from": "guest.state",
    "fieldname": "state",
    "fieldtype": "Data",
    "label": "State"
@@ -432,12 +473,14 @@
    "fieldtype": "Column Break"
   },
   {
+   "fetch_from": "guest.nationality",
    "fieldname": "country",
    "fieldtype": "Link",
    "label": "Country",
    "options": "Country"
   },
   {
+   "fetch_from": "guest.postal_code",
    "fieldname": "postal_code",
    "fieldtype": "Data",
    "label": "Postal Code"
@@ -458,28 +501,176 @@
   {
    "fieldname": "column_break_mvqd",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_ndhg",
+   "fieldtype": "Section Break"
+  },
+  {
+   "depends_on": "eval:['Direct Bill'].includes(doc.payment_method)",
+   "fieldname": "customer_id",
+   "fieldtype": "Link",
+   "label": "Customer ID",
+   "options": "Customer"
+  },
+  {
+   "depends_on": "eval:['Cash'].includes(doc.payment_method)",
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "Amount"
+  },
+  {
+   "fieldname": "section_break_jmqu",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_imij",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "guest.id_number",
+   "fieldname": "id_number",
+   "fieldtype": "Data",
+   "label": "ID Number"
+  },
+  {
+   "fetch_from": "guest.address_line_1",
+   "fieldname": "address_line_1",
+   "fieldtype": "Data",
+   "label": "Address Line 1"
+  },
+  {
+   "fetch_from": "guest.address_line_2",
+   "fieldname": "address_line_2",
+   "fieldtype": "Data",
+   "label": "Address Line 2"
+  },
+  {
+   "fetch_from": "guest.id_type",
+   "fieldname": "guest_id_type",
+   "fieldtype": "Select",
+   "label": "Guest ID Type",
+   "options": "\nPassport\nDriver License\nNational ID\nOther",
+   "report_hide": 1
+  },
+  {
+   "fieldname": "rate_details_tab",
+   "fieldtype": "Tab Break",
+   "label": "Rate Details"
+  },
+  {
+   "fieldname": "column_break_rxah",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_amte",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_gufu",
+   "fieldtype": "Section Break"
+  },
+  {
+   "depends_on": "eval:['Cheque'].includes(doc.payment_method)",
+   "fieldname": "cheque_number",
+   "fieldtype": "Int",
+   "label": "Cheque Number"
+  },
+  {
+   "depends_on": "eval:['Cheque'].includes(doc.payment_method)",
+   "fieldname": "cheque_amount",
+   "fieldtype": "Currency",
+   "label": "Cheque Amount"
+  },
+  {
+   "depends_on": "eval:['Cheque'].includes(doc.payment_method)",
+   "fieldname": "date_of_the_cheque",
+   "fieldtype": "Date",
+   "label": "Date of the Cheque"
+  },
+  {
+   "depends_on": "eval:['Cheque'].includes(doc.payment_method)",
+   "fetch_from": "guest.id_number",
+   "fieldname": "guest_identification",
+   "fieldtype": "Data",
+   "label": "Guest Identification"
+  },
+  {
+   "fieldname": "column_break_dtml",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_zcsq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:['Cheque'].includes(doc.payment_method)",
+   "fieldname": "bank_name",
+   "fieldtype": "Data",
+   "label": "Bank Name"
+  },
+  {
+   "depends_on": "eval:['Cheque'].includes(doc.payment_method)",
+   "fieldname": "bank_account_no",
+   "fieldtype": "Int",
+   "label": "Bank Account No."
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-19 12:55:11.200793",
+ "modified": "2026-03-20 10:37:12.684164",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Reservation",
  "owner": "Administrator",
  "permissions": [
   {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
-   "read": 1,
    "report": 1,
-   "role": "System Manager",
+   "share": 1
+  },
+  {
+   "role": "General Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
    "share": 1,
-   "write": 1
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1
+  },
+  {
+   "role": "Front Desk Agent",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1
+  },
+  {
+   "role": "Revenue Manager",
+   "read": 1,
+   "export": 1,
+   "report": 1
   }
  ],
  "row_format": "Dynamic",

@@ -18,20 +18,37 @@
   "column_break_bzuq",
   "guest_name",
   "check_out_date",
-  "section_break_lnmk",
+  "section_break_rate",
   "room_rate",
-  "section_break_xkkl",
+  "charges_tab",
+  "charges",
+  "payments_tab",
   "payments",
-  "section_break_yqvd",
-  "outstanding_balance",
+  "summary_section",
+  "total_amount",
   "column_break_wndg",
   "total_payments",
   "column_break_iocx",
-  "total_amount",
+  "outstanding_balance",
   "notes_tab",
   "notes"
  ],
  "fields": [
+  {
+   "fieldname": "room_information_section",
+   "fieldtype": "Section Break",
+   "label": "Stay"
+  },
+  {
+   "fieldname": "hotel_stay",
+   "fieldtype": "Link",
+   "label": "Checked In",
+   "options": "Checked In"
+  },
+  {
+   "fieldname": "column_break_jlcs",
+   "fieldtype": "Column Break"
+  },
   {
    "fetch_from": "hotel_stay.room",
    "fieldname": "room",
@@ -40,24 +57,22 @@
    "options": "Room"
   },
   {
-   "fieldname": "room_information_section",
-   "fieldtype": "Section Break",
-   "label": "Room Information"
-  },
-  {
    "fieldname": "column_break_fvkn",
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "hotel_stay",
-   "fieldtype": "Link",
-   "label": "Check In",
-   "options": "Check In"
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Open\nSettled\nTransferred"
   },
   {
    "fieldname": "guest_information_section",
    "fieldtype": "Section Break",
-   "label": "Guest Information"
+   "label": "Guest"
   },
   {
    "fetch_from": "hotel_stay.guest",
@@ -65,6 +80,13 @@
    "fieldtype": "Link",
    "label": "Guest",
    "options": "Guest",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "hotel_stay.actual_check_in",
+   "fieldname": "check_in_date",
+   "fieldtype": "Datetime",
+   "label": "Check In",
    "read_only": 1
   },
   {
@@ -79,22 +101,38 @@
    "read_only": 1
   },
   {
-   "fetch_from": "hotel_stay.actual_check_in",
-   "fieldname": "check_in_date",
-   "fieldtype": "Datetime",
-   "label": "Check In Date",
-   "read_only": 1
-  },
-  {
    "fetch_from": "hotel_stay.actual_check_out",
    "fieldname": "check_out_date",
    "fieldtype": "Datetime",
-   "label": "Check Out Date",
+   "label": "Check Out",
    "read_only": 1
   },
   {
-   "fieldname": "section_break_xkkl",
+   "fieldname": "section_break_rate",
    "fieldtype": "Section Break"
+  },
+  {
+   "fetch_from": "hotel_stay.room_rate",
+   "fieldname": "room_rate",
+   "fieldtype": "Currency",
+   "label": "Room Rate / Night",
+   "read_only": 1
+  },
+  {
+   "fieldname": "charges_tab",
+   "fieldtype": "Tab Break",
+   "label": "Charges"
+  },
+  {
+   "fieldname": "charges",
+   "fieldtype": "Table",
+   "label": "Charges",
+   "options": "Folio Charge"
+  },
+  {
+   "fieldname": "payments_tab",
+   "fieldtype": "Tab Break",
+   "label": "Payments"
   },
   {
    "fieldname": "payments",
@@ -103,21 +141,16 @@
    "options": "Payment Items"
   },
   {
-   "fieldname": "section_break_yqvd",
+   "fieldname": "summary_section",
    "fieldtype": "Section Break",
-   "label": "Financial Summary "
+   "label": "Financial Summary"
   },
   {
    "default": "0.00",
    "fieldname": "total_amount",
    "fieldtype": "Currency",
-   "label": "Total Charges"
-  },
-  {
-   "default": "0.00",
-   "fieldname": "outstanding_balance",
-   "fieldtype": "Currency",
-   "label": "Outstanding Balance"
+   "label": "Total Charges",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_wndg",
@@ -127,29 +160,19 @@
    "default": "0.00",
    "fieldname": "total_payments",
    "fieldtype": "Currency",
-   "label": "Total Payments "
+   "label": "Total Payments",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_iocx",
    "fieldtype": "Column Break"
   },
   {
-   "default": "Open",
-   "fieldname": "status",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Status",
-   "options": "Open\nSettled\nTransferred"
-  },
-  {
-   "fieldname": "notes",
-   "fieldtype": "Text",
-   "label": "Notes"
-  },
-  {
-   "fieldname": "column_break_jlcs",
-   "fieldtype": "Column Break"
+   "default": "0.00",
+   "fieldname": "outstanding_balance",
+   "fieldtype": "Currency",
+   "label": "Outstanding Balance",
+   "read_only": 1
   },
   {
    "fieldname": "notes_tab",
@@ -157,21 +180,15 @@
    "label": "Notes"
   },
   {
-   "fieldname": "section_break_lnmk",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fetch_from": "hotel_stay.room_rate",
-   "fieldname": "room_rate",
-   "fieldtype": "Currency",
-   "label": "Room Rate",
-   "read_only": 1
+   "fieldname": "notes",
+   "fieldtype": "Text",
+   "label": "Notes"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-19 09:26:11.051382",
+ "modified": "2026-03-20 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "iHotel Profile",
@@ -179,16 +196,51 @@
  "owner": "Administrator",
  "permissions": [
   {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
-   "read": 1,
    "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
+   "share": 1
+  },
+  {
+   "role": "General Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Front Desk Agent",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Hotel Accountant",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
   }
  ],
  "row_format": "Dynamic",

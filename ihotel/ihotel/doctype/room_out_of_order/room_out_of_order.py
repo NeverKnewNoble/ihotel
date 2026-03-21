@@ -14,7 +14,7 @@ class RoomOutofOrder(Document):
 				frappe.throw(_("From Date must be before To Date."))
 
 		if self.room and self.status == "Out of Order":
-			active_stay = frappe.db.exists("Check In", {
+			active_stay = frappe.db.exists("Checked In", {
 				"room": self.room,
 				"status": ["in", ["Reserved", "Checked In"]],
 				"docstatus": 1,

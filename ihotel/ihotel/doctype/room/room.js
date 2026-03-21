@@ -5,7 +5,7 @@ frappe.ui.form.on("Room", {
 	refresh(frm) {
 		// Show current stay if room is occupied
 		if (frm.doc.status === "Occupied") {
-			frappe.db.get_value("Check In", {
+			frappe.db.get_value("Checked In", {
 				"room": frm.doc.name,
 				"status": ["in", ["Checked In", "Reserved"]],
 				"docstatus": 1
@@ -13,7 +13,7 @@ frappe.ui.form.on("Room", {
 			.then(r => {
 				if (r.message && r.message.name) {
 					frm.add_custom_button(__("View Stay"), function() {
-						frappe.set_route("Form", "Check In", r.message.name);
+						frappe.set_route("Form", "Checked In", r.message.name);
 					});
 				}
 			});

@@ -39,7 +39,7 @@ add_to_apps_screen = [
 # ------------------
 
 # include js, css files in header of desk.html
-# app_include_css = "/assets/ihotel/css/ihotel.css"
+app_include_css = "/assets/ihotel/css/ihotel.css"
 # app_include_js = "/assets/ihotel/js/ihotel.js"
 
 # include js, css files in header of web template
@@ -60,7 +60,10 @@ add_to_apps_screen = [
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
-# doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
+doctype_calendar_js = {
+	"Reservation": "public/js/reservation_calendar.js",
+	"Checked In":  "public/js/checked_in_calendar.js",
+}
 
 # Svg Icons
 # ------------------
@@ -159,6 +162,7 @@ scheduler_events = {
 	"daily": [
 		"ihotel.tasks.auto_no_show",
 		"ihotel.tasks.auto_generate_housekeeping",
+		"ihotel.tasks.send_birthday_notifications",
 	],
 	"cron": {
 		"0 23 * * *": [
@@ -169,7 +173,7 @@ scheduler_events = {
 
 # Document Events
 doc_events = {
-	"Check In": {
+	"Checked In": {
 		"on_update_after_submit": "ihotel.notifications.on_hotel_stay_update",
 	},
 	"Reservation": {

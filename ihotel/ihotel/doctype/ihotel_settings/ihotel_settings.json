@@ -7,34 +7,76 @@
  "field_order": [
   "hotel_information_tab",
   "hotel_name",
+  "logo",
   "section_break_troq",
   "email",
   "column_break_kjka",
   "contact_number",
   "column_break_qvhz",
-  "total_rooms",
+  "website",
   "section_break_couq",
   "address",
+  "column_break_addr2",
+  "city",
+  "column_break_addr3",
+  "country",
+  "financial_tab",
+  "currency",
+  "column_break_fin2",
+  "tax_registration_number",
   "check_in_defaults_tab",
   "section_break_djqb",
   "default_check_in_time",
   "column_break_ympd",
-  "default_check_out_time"
+  "default_check_out_time",
+  "section_break_fees",
+  "late_checkout_fee",
+  "column_break_fees2",
+  "early_checkin_fee",
+  "section_break_rooms",
+  "total_rooms",
+  "notifications_tab",
+  "section_break_email_from",
+  "email_sender_name",
+  "column_break_email_from2",
+  "email_sender_address",
+  "section_break_notif_toggles",
+  "send_reservation_confirmation",
+  "send_checkout_receipt",
+  "column_break_notif2",
+  "send_birthday_email",
+  "send_birthday_staff_alert",
+  "policies_tab",
+  "cancellation_policy",
+  "column_break_pol2",
+  "privacy_policy"
  ],
  "fields": [
+  {
+   "fieldname": "hotel_information_tab",
+   "fieldtype": "Tab Break",
+   "label": "Hotel Information"
+  },
   {
    "fieldname": "hotel_name",
    "fieldtype": "Data",
    "label": "Hotel Name"
   },
   {
+   "fieldname": "logo",
+   "fieldtype": "Attach Image",
+   "label": "Hotel Logo"
+  },
+  {
    "fieldname": "section_break_troq",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Contact"
   },
   {
    "fieldname": "email",
    "fieldtype": "Data",
-   "label": "Email"
+   "label": "Hotel Email",
+   "options": "Email"
   },
   {
    "fieldname": "column_break_kjka",
@@ -46,20 +88,75 @@
    "label": "Contact Number"
   },
   {
+   "fieldname": "column_break_qvhz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "website",
+   "fieldtype": "Data",
+   "label": "Website"
+  },
+  {
    "fieldname": "section_break_couq",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Address"
   },
   {
    "fieldname": "address",
    "fieldtype": "Text",
-   "label": "Address"
+   "label": "Street Address"
+  },
+  {
+   "fieldname": "column_break_addr2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "label": "City"
+  },
+  {
+   "fieldname": "column_break_addr3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "country",
+   "fieldtype": "Link",
+   "label": "Country",
+   "options": "Country"
+  },
+  {
+   "fieldname": "financial_tab",
+   "fieldtype": "Tab Break",
+   "label": "Financial"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Default Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "column_break_fin2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tax_registration_number",
+   "fieldtype": "Data",
+   "label": "Tax Registration Number (TIN/VAT)"
+  },
+  {
+   "fieldname": "check_in_defaults_tab",
+   "fieldtype": "Tab Break",
+   "label": "Guest Stay Defaults"
   },
   {
    "fieldname": "section_break_djqb",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Default Times"
   },
   {
-   "default": "12:00:00",
+   "default": "14:00:00",
    "fieldname": "default_check_in_time",
    "fieldtype": "Time",
    "label": "Default Check In Time"
@@ -69,10 +166,33 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "14:00:00",
+   "default": "12:00:00",
    "fieldname": "default_check_out_time",
    "fieldtype": "Time",
    "label": "Default Check Out Time"
+  },
+  {
+   "fieldname": "section_break_fees",
+   "fieldtype": "Section Break",
+   "label": "Fee Defaults"
+  },
+  {
+   "fieldname": "late_checkout_fee",
+   "fieldtype": "Currency",
+   "label": "Late Checkout Fee"
+  },
+  {
+   "fieldname": "column_break_fees2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "early_checkin_fee",
+   "fieldtype": "Currency",
+   "label": "Early Check-In Fee"
+  },
+  {
+   "fieldname": "section_break_rooms",
+   "fieldtype": "Section Break"
   },
   {
    "fieldname": "total_rooms",
@@ -80,39 +200,116 @@
    "label": "Total Rooms"
   },
   {
-   "fieldname": "hotel_information_tab",
+   "fieldname": "notifications_tab",
    "fieldtype": "Tab Break",
-   "label": "Hotel Information"
+   "label": "Notifications & Email"
   },
   {
-   "fieldname": "column_break_qvhz",
+   "fieldname": "section_break_email_from",
+   "fieldtype": "Section Break",
+   "label": "Email Sender"
+  },
+  {
+   "fieldname": "email_sender_name",
+   "fieldtype": "Data",
+   "label": "Sender Name"
+  },
+  {
+   "fieldname": "column_break_email_from2",
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "check_in_defaults_tab",
+   "fieldname": "email_sender_address",
+   "fieldtype": "Data",
+   "label": "Sender Email Address",
+   "options": "Email"
+  },
+  {
+   "fieldname": "section_break_notif_toggles",
+   "fieldtype": "Section Break",
+   "label": "Email Triggers"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_reservation_confirmation",
+   "fieldtype": "Check",
+   "label": "Send Reservation Confirmation Email"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_checkout_receipt",
+   "fieldtype": "Check",
+   "label": "Send Checkout Receipt Email"
+  },
+  {
+   "fieldname": "column_break_notif2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_birthday_email",
+   "fieldtype": "Check",
+   "label": "Send Birthday Email to Guest"
+  },
+  {
+   "default": "1",
+   "fieldname": "send_birthday_staff_alert",
+   "fieldtype": "Check",
+   "label": "Birthday Staff Alert"
+  },
+  {
+   "fieldname": "policies_tab",
    "fieldtype": "Tab Break",
-   "label": "Guest Stay Defaults"
+   "label": "Policies"
+  },
+  {
+   "fieldname": "cancellation_policy",
+   "fieldtype": "Text Editor",
+   "label": "Cancellation Policy"
+  },
+  {
+   "fieldname": "column_break_pol2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "privacy_policy",
+   "fieldtype": "Text Editor",
+   "label": "Privacy Policy"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-02-12 07:27:17.309219",
+ "modified": "2026-03-20 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "iHotel Settings",
  "owner": "Administrator",
  "permissions": [
   {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
+   "export": 1,
    "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "General Manager",
    "read": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
   }
  ],
  "row_format": "Dynamic",

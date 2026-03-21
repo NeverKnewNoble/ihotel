@@ -6,7 +6,7 @@ from frappe.tests.utils import FrappeTestCase
 from frappe.utils import add_to_date, now_datetime
 
 
-class TestCheckIn(FrappeTestCase):
+class TestCheckedIn(FrappeTestCase):
 	def test_room_status_tracks_stay_lifecycle(self):
 		"""Room becomes occupied after check-in and reverts to available on checkout."""
 		suffix = frappe.generate_hash(length=8)
@@ -30,7 +30,7 @@ class TestCheckIn(FrappeTestCase):
 		}).insert(ignore_permissions=True)
 
 		stay = frappe.get_doc({
-			"doctype": "Check In",
+			"doctype": "Checked In",
 			"guest": guest.name,
 			"room_type": room_type.name,
 			"room": room.name,

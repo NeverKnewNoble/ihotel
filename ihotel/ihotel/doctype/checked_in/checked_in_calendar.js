@@ -1,4 +1,4 @@
-frappe.views.calendar["Check In"] = {
+frappe.views.calendar["Checked In"] = {
 	field_map: {
 		start: "expected_check_in",
 		end: "expected_check_out",

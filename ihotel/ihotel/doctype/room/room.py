@@ -40,7 +40,7 @@ class Room(Document):
         Status is automatically set to Occupied if there's an active stay.
         """
         if self.name:  # Only check for existing rooms
-            current_stay = frappe.db.exists("Check In", {
+            current_stay = frappe.db.exists("Checked In", {
                 "room": self.name,
                 "status": ["in", ["Checked In", "Reserved"]],
                 "docstatus": 1

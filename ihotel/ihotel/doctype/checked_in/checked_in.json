@@ -18,6 +18,7 @@
   "actual_check_out",
   "section_break_rbyp",
   "status",
+  "color",
   "column_break_ondo",
   "nights",
   "column_break_vvzc",
@@ -28,6 +29,16 @@
   "room_rate",
   "column_break_osgw",
   "total_amount",
+  "deposit_section",
+  "deposit_amount",
+  "deposit_received",
+  "column_break_dep2",
+  "deposit_method",
+  "deposit_reference",
+  "section_break_pax",
+  "adults",
+  "column_break_pax2",
+  "children",
   "guest_services_section",
   "do_not_disturb",
   "make_up_room",
@@ -45,6 +56,8 @@
   {
    "fieldname": "guest",
    "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Guest",
    "options": "Guest",
    "unique": 1
@@ -78,6 +91,7 @@
   {
    "fieldname": "room",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Room",
    "options": "Room"
   },
@@ -99,10 +113,17 @@
   },
   {
    "allow_on_submit": 1,
+   "fieldname": "color",
+   "fieldtype": "Color",
+   "label": "Calendar Color"
+  },
+  {
+   "allow_on_submit": 1,
    "default": "Reserved",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Status",
    "options": "Reserved\nChecked In\nChecked Out\nNo Show\nCancelled"
   },
@@ -130,12 +151,69 @@
   {
    "fieldname": "nights",
    "fieldtype": "Int",
+   "in_list_view": 1,
    "label": "Nights"
   },
   {
    "fieldname": "total_amount",
    "fieldtype": "Currency",
    "label": "Total Amount"
+  },
+  {
+   "fieldname": "section_break_pax",
+   "fieldtype": "Section Break",
+   "label": "Occupants"
+  },
+  {
+   "default": "1",
+   "fieldname": "adults",
+   "fieldtype": "Int",
+   "label": "Adults"
+  },
+  {
+   "fieldname": "column_break_pax2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "children",
+   "fieldtype": "Int",
+   "label": "Children"
+  },
+  {
+   "fieldname": "deposit_section",
+   "fieldtype": "Section Break",
+   "label": "Deposit / Pre-Authorization"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "deposit_amount",
+   "fieldtype": "Currency",
+   "label": "Deposit Amount"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "fieldname": "deposit_received",
+   "fieldtype": "Check",
+   "label": "Deposit Received"
+  },
+  {
+   "fieldname": "column_break_dep2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "deposit_method",
+   "fieldtype": "Select",
+   "label": "Deposit Method",
+   "options": "\nCash\nVisa\nMastercard\nAmex\nBank Transfer\nCity Ledger"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "deposit_reference",
+   "fieldtype": "Data",
+   "label": "Deposit Reference / Auth Code"
   },
   {
    "fieldname": "guest_services_section",
@@ -206,7 +284,7 @@
    "fieldtype": "Link",
    "label": "Amended From",
    "no_copy": 1,
-   "options": "Check In",
+   "options": "Checked In",
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
@@ -235,22 +313,62 @@
  "modified": "2026-02-18 16:13:57.906438",
  "modified_by": "Administrator",
  "module": "iHotel",
- "name": "Check In",
+ "name": "Checked In",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
-   "read": 1,
    "report": 1,
-   "role": "System Manager",
+   "share": 1
+  },
+  {
+   "role": "General Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
    "share": 1,
    "submit": 1,
-   "write": 1
+   "cancel": 1,
+   "amend": 1
+  },
+  {
+   "role": "Front Desk Agent",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1,
+   "submit": 1,
+   "cancel": 1,
+   "amend": 1
+  },
+  {
+   "role": "Revenue Manager",
+   "read": 1,
+   "export": 1,
+   "report": 1
+  },
+  {
+   "role": "Hotel Accountant",
+   "read": 1,
+   "export": 1,
+   "report": 1
   }
  ],
  "row_format": "Dynamic",

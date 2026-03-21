@@ -305,6 +305,37 @@
 	margin-top: 2px;
 }
 
+/* ── Check In button on card ── */
+.rb-checkin-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 5px;
+	width: 100%;
+	margin-top: 10px;
+	padding: 6px 10px;
+	border: 1px solid #10b981;
+	border-radius: 6px;
+	background: transparent;
+	color: #10b981;
+	font-size: 11px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: background 0.15s, color 0.15s;
+	letter-spacing: 0.02em;
+}
+
+.rb-checkin-btn svg {
+	width: 12px;
+	height: 12px;
+	flex-shrink: 0;
+}
+
+.rb-checkin-btn:hover {
+	background: #10b981;
+	color: #fff;
+}
+
 /* ── Dark mode ── */
 [data-theme="dark"] .rb-search,
 [data-theme="dark"] .rb-filter-type,
@@ -314,4 +345,45 @@
 
 [data-theme="dark"] .rb-pill.active[data-status=""] {
 	background: #6b7280;
+}
+
+/* ── Status Legend ── */
+.rb-legend {
+	margin-top: 24px;
+	padding: 16px 20px;
+	background: var(--fg-color, #fff);
+	border: 1px solid var(--border-color, #e2e6ea);
+	border-radius: 8px;
+}
+
+.rb-legend-title {
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: .6px;
+	color: var(--text-muted, #6c757d);
+	margin-bottom: 12px;
+}
+
+.rb-legend-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+	gap: 8px 24px;
+}
+
+.rb-legend-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+	color: var(--text-color, #333);
+}
+
+.rb-legend-item .rb-dot {
+	flex-shrink: 0;
+}
+
+[data-theme="dark"] .rb-legend {
+	background: var(--fg-color, #1f2937);
+	border-color: var(--border-color, #374151);
 }

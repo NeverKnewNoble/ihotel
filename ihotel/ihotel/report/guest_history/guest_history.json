@@ -16,7 +16,7 @@
  "name": "Guest History",
  "owner": "Administrator",
  "prepared_report": 0,
- "ref_doctype": "Check In",
+ "ref_doctype": "Checked In",
  "report_name": "Guest History",
  "report_type": "Script Report",
  "roles": [

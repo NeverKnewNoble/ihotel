@@ -18,7 +18,7 @@ def get_hk_board_data():
 		room["turndown_requested"] = 0
 
 		stay = frappe.db.get_value(
-			"Check In",
+			"Checked In",
 			filters={
 				"room": room["name"],
 				"status": ["in", ["Reserved", "Checked In"]],

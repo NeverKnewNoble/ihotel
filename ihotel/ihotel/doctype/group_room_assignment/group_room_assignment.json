@@ -1,0 +1,79 @@
+{
+ "actions": [],
+ "creation": "2026-03-20 09:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "guest_name",
+  "room_type",
+  "column_break_gra2",
+  "room",
+  "adults",
+  "column_break_gra3",
+  "children",
+  "special_requests"
+ ],
+ "fields": [
+  {
+   "fieldname": "guest_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Guest Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "room_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Room Type",
+   "options": "Room Type"
+  },
+  {
+   "fieldname": "column_break_gra2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "room",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Assigned Room",
+   "options": "Room"
+  },
+  {
+   "default": "1",
+   "fieldname": "adults",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Adults"
+  },
+  {
+   "fieldname": "column_break_gra3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "children",
+   "fieldtype": "Int",
+   "label": "Children"
+  },
+  {
+   "fieldname": "special_requests",
+   "fieldtype": "Small Text",
+   "label": "Special Requests"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-20 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "iHotel",
+ "name": "Group Room Assignment",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

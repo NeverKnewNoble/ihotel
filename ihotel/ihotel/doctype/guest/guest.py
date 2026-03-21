@@ -33,7 +33,7 @@ def get_guest_stats(guest_name):
 			IFNULL(SUM(nights), 0)               AS total_nights,
 			IFNULL(SUM(total_amount), 0)         AS total_revenue,
 			MAX(DATE(actual_check_in))           AS last_stay_date
-		FROM `tabCheck In`
+		FROM `tabChecked In`
 		WHERE guest = %s
 		  AND status = 'Checked Out'
 		  AND docstatus = 1
