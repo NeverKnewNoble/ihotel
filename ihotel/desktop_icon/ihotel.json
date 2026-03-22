@@ -1,28 +1,22 @@
 {
  "app": "ihotel",
  "bg_color": "blue",
- "creation": "2026-02-11 14:09:39.919738",
+ "creation": "2026-03-22 17:50:53.455573",
  "docstatus": 0,
  "doctype": "Desktop Icon",
- "hidden": 0,
- "icon": "retail",
- "icon_image": "/files/ihotel.png",
- "icon_type": "App",
+ "hidden": 1,
+ "icon": "home",
+ "icon_type": "Link",
  "idx": 0,
  "label": "iHotel",
  "link_to": "iHotel",
  "link_type": "Workspace Sidebar",
- "logo_url": "",
- "modified": "2026-02-11 17:54:06.243191",
+ "modified": "2026-03-22 17:50:53.455573",
  "modified_by": "Administrator",
  "name": "iHotel",
  "owner": "Administrator",
+ "parent_icon": "",
  "restrict_removal": 0,
- "roles": [
-  {
-   "role": "All"
-  }
- ],
- "sidebar": "",
+ "roles": [],
  "standard": 1
 }
