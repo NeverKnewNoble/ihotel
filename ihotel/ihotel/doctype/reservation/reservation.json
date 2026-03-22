@@ -99,7 +99,8 @@
   "date_of_the_cheque",
   "section_break_ndhg",
   "customer_id",
-  "amount"
+  "amount",
+  "confirmation_email_sent"
  ],
  "fields": [
   {
@@ -614,6 +615,13 @@
    "fieldname": "bank_account_no",
    "fieldtype": "Int",
    "label": "Bank Account No."
+  },
+  {
+   "default": "0",
+   "fieldname": "confirmation_email_sent",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Confirmation Email Sent"
   }
  ],
  "grid_page_length": 50,
