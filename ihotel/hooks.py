@@ -11,6 +11,7 @@ fixtures = [
     {"dt": "Workspace Sidebar", "filters": [["app", "=", "ihotel"]]},
 	{"doctype": "Business Source Type", "filters": [["module" , "in" , ("ihotel" )]]},
 	{"doctype": "Business Channel Category", "filters": [["module" , "in" , ("ihotel" )]]},
+	{"doctype": "Notification", "filters": [["name", "=", "Reservation Confirmation Letter"]]},
 ]
 
 # Apps
@@ -176,9 +177,7 @@ doc_events = {
 	"Checked In": {
 		"on_update_after_submit": "ihotel.notifications.on_hotel_stay_update",
 	},
-	"Reservation": {
-		"on_update": "ihotel.notifications.on_reservation_update",
-	},
+	# Reservation confirmation is handled by the "Reservation Confirmation Letter" Notification fixture
 }
 
 # Testing

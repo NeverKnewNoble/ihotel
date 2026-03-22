@@ -46,6 +46,20 @@
   "column_break_notif2",
   "send_birthday_email",
   "send_birthday_staff_alert",
+  "confirmation_letter_tab",
+  "section_break_signatory",
+  "hotel_signatory_name",
+  "column_break_sign2",
+  "hotel_signatory_title",
+  "included_services_section",
+  "included_services",
+  "late_checkout_policy_section",
+  "late_checkout_policy",
+  "airport_transfer_policy",
+  "column_break_ltco2",
+  "booking_guarantee_policy",
+  "data_privacy_section",
+  "data_privacy_notice",
   "policies_tab",
   "cancellation_policy",
   "column_break_pol2",
@@ -258,6 +272,81 @@
    "label": "Birthday Staff Alert"
   },
   {
+   "fieldname": "confirmation_letter_tab",
+   "fieldtype": "Tab Break",
+   "label": "Confirmation Letter"
+  },
+  {
+   "fieldname": "section_break_signatory",
+   "fieldtype": "Section Break",
+   "label": "Letter Signatory"
+  },
+  {
+   "fieldname": "hotel_signatory_name",
+   "fieldtype": "Data",
+   "label": "Signatory Name",
+   "description": "Name of the person who signs confirmation letters (e.g. Gifty Alinya)"
+  },
+  {
+   "fieldname": "column_break_sign2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "hotel_signatory_title",
+   "fieldtype": "Data",
+   "label": "Signatory Title",
+   "description": "e.g. Reservations Manager"
+  },
+  {
+   "fieldname": "included_services_section",
+   "fieldtype": "Section Break",
+   "label": "Included Services & Facilities",
+   "description": "These bullet points appear in the confirmation letter under 'Included Services'. Use plain text, one item per line."
+  },
+  {
+   "fieldname": "included_services",
+   "fieldtype": "Text",
+   "label": "Included Services",
+   "description": "Enter each service on a new line. Each line will appear as a bullet point in the confirmation letter."
+  },
+  {
+   "fieldname": "late_checkout_policy_section",
+   "fieldtype": "Section Break",
+   "label": "Check-In / Check-Out Policies"
+  },
+  {
+   "fieldname": "late_checkout_policy",
+   "fieldtype": "Small Text",
+   "label": "Late Check-Out Policy",
+   "description": "e.g. Until 6:00 PM, subject to a 50% surcharge. After 6:00 PM, a full night's charge applies."
+  },
+  {
+   "fieldname": "airport_transfer_policy",
+   "fieldtype": "Small Text",
+   "label": "Airport Transfer Policy"
+  },
+  {
+   "fieldname": "column_break_ltco2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "booking_guarantee_policy",
+   "fieldtype": "Small Text",
+   "label": "Booking Guarantee Policy",
+   "description": "e.g. A valid credit card is required to secure the reservation."
+  },
+  {
+   "fieldname": "data_privacy_section",
+   "fieldtype": "Section Break",
+   "label": "Data Privacy Notice"
+  },
+  {
+   "fieldname": "data_privacy_notice",
+   "fieldtype": "Text",
+   "label": "Data Privacy Notice",
+   "description": "Appears at the bottom of the confirmation letter."
+  },
+  {
    "fieldname": "policies_tab",
    "fieldtype": "Tab Break",
    "label": "Policies"
@@ -281,7 +370,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-20 09:00:00.000000",
+ "modified": "2026-03-21 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "iHotel Settings",
