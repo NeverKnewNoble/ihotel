@@ -15,11 +15,11 @@
   "column_break_qvhz",
   "website",
   "section_break_couq",
-  "address",
-  "column_break_addr2",
   "city",
-  "column_break_addr3",
+  "column_break_addr2",
   "country",
+  "section_break_nsgz",
+  "address",
   "financial_tab",
   "currency",
   "column_break_fin2",
@@ -35,6 +35,7 @@
   "early_checkin_fee",
   "section_break_rooms",
   "total_rooms",
+  "allow_past_dates",
   "notifications_tab",
   "section_break_email_from",
   "email_sender_name",
@@ -60,6 +61,25 @@
   "booking_guarantee_policy",
   "data_privacy_section",
   "data_privacy_notice",
+  "accounting_tab",
+  "section_break_acct",
+  "enable_accounting_integration",
+  "section_break_acct2",
+  "company",
+  "column_break_acct2",
+  "accounts_receivable_account",
+  "section_break_acct3",
+  "room_revenue_account",
+  "column_break_acct3",
+  "extra_charges_income_account",
+  "section_break_acct4",
+  "room_charge_item",
+  "column_break_acct4",
+  "extra_charge_item",
+  "section_break_acct5",
+  "default_customer_group",
+  "column_break_acct5",
+  "default_territory",
   "policies_tab",
   "cancellation_policy",
   "column_break_pol2",
@@ -128,10 +148,6 @@
    "fieldname": "city",
    "fieldtype": "Data",
    "label": "City"
-  },
-  {
-   "fieldname": "column_break_addr3",
-   "fieldtype": "Column Break"
   },
   {
    "fieldname": "country",
@@ -282,32 +298,32 @@
    "label": "Letter Signatory"
   },
   {
+   "description": "Name of the person who signs confirmation letters (e.g. Gifty Alinya)",
    "fieldname": "hotel_signatory_name",
    "fieldtype": "Data",
-   "label": "Signatory Name",
-   "description": "Name of the person who signs confirmation letters (e.g. Gifty Alinya)"
+   "label": "Signatory Name"
   },
   {
    "fieldname": "column_break_sign2",
    "fieldtype": "Column Break"
   },
   {
+   "description": "e.g. Reservations Manager",
    "fieldname": "hotel_signatory_title",
    "fieldtype": "Data",
-   "label": "Signatory Title",
-   "description": "e.g. Reservations Manager"
+   "label": "Signatory Title"
   },
   {
+   "description": "These bullet points appear in the confirmation letter under 'Included Services'. Use plain text, one item per line.",
    "fieldname": "included_services_section",
    "fieldtype": "Section Break",
-   "label": "Included Services & Facilities",
-   "description": "These bullet points appear in the confirmation letter under 'Included Services'. Use plain text, one item per line."
+   "label": "Included Services & Facilities"
   },
   {
+   "description": "Enter each service on a new line. Each line will appear as a bullet point in the confirmation letter.",
    "fieldname": "included_services",
    "fieldtype": "Text",
-   "label": "Included Services",
-   "description": "Enter each service on a new line. Each line will appear as a bullet point in the confirmation letter."
+   "label": "Included Services"
   },
   {
    "fieldname": "late_checkout_policy_section",
@@ -315,10 +331,10 @@
    "label": "Check-In / Check-Out Policies"
   },
   {
+   "description": "e.g. Until 6:00 PM, subject to a 50% surcharge. After 6:00 PM, a full night's charge applies.",
    "fieldname": "late_checkout_policy",
    "fieldtype": "Small Text",
-   "label": "Late Check-Out Policy",
-   "description": "e.g. Until 6:00 PM, subject to a 50% surcharge. After 6:00 PM, a full night's charge applies."
+   "label": "Late Check-Out Policy"
   },
   {
    "fieldname": "airport_transfer_policy",
@@ -330,10 +346,10 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "e.g. A valid credit card is required to secure the reservation.",
    "fieldname": "booking_guarantee_policy",
    "fieldtype": "Small Text",
-   "label": "Booking Guarantee Policy",
-   "description": "e.g. A valid credit card is required to secure the reservation."
+   "label": "Booking Guarantee Policy"
   },
   {
    "fieldname": "data_privacy_section",
@@ -341,10 +357,10 @@
    "label": "Data Privacy Notice"
   },
   {
+   "description": "Appears at the bottom of the confirmation letter.",
    "fieldname": "data_privacy_notice",
    "fieldtype": "Text",
-   "label": "Data Privacy Notice",
-   "description": "Appears at the bottom of the confirmation letter."
+   "label": "Data Privacy Notice"
   },
   {
    "fieldname": "policies_tab",
@@ -364,41 +380,162 @@
    "fieldname": "privacy_policy",
    "fieldtype": "Text Editor",
    "label": "Privacy Policy"
+  },
+  {
+   "default": "0",
+   "description": "When enabled, staff can create Reservations and Checked In records with past dates. Useful for data entry, migration, and walk-in back-dating. Leave disabled in normal operation to prevent accidental back-dating.",
+   "fieldname": "allow_past_dates",
+   "fieldtype": "Check",
+   "label": "Allow Past Date Reservations & Check-Ins"
+  },
+  {
+   "fieldname": "accounting_tab",
+   "fieldtype": "Tab Break",
+   "label": "Accounting"
+  },
+  {
+   "fieldname": "section_break_acct",
+   "fieldtype": "Section Break",
+   "label": "ERPNext Integration"
+  },
+  {
+   "default": "0",
+   "description": "When enabled, a Sales Invoice is automatically created in ERPNext when a guest checks out, and Payment Entries are created for folio payments.",
+   "fieldname": "enable_accounting_integration",
+   "fieldtype": "Check",
+   "label": "Create Sales Invoice & Payment Entry on Checkout"
+  },
+  {
+   "fieldname": "section_break_acct2",
+   "fieldtype": "Section Break",
+   "label": "Company & Receivable"
+  },
+  {
+   "depends_on": "eval:doc.enable_accounting_integration",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "column_break_acct2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.enable_accounting_integration",
+   "description": "Debit account for guest invoices (e.g. Debtors or Trade Receivables)",
+   "fieldname": "accounts_receivable_account",
+   "fieldtype": "Link",
+   "label": "Accounts Receivable Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "section_break_acct3",
+   "fieldtype": "Section Break",
+   "label": "Income Accounts"
+  },
+  {
+   "depends_on": "eval:doc.enable_accounting_integration",
+   "description": "Credit account for room charges",
+   "fieldname": "room_revenue_account",
+   "fieldtype": "Link",
+   "label": "Room Revenue Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_acct3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.enable_accounting_integration",
+   "description": "Credit account for F&B, laundry, minibar, etc.",
+   "fieldname": "extra_charges_income_account",
+   "fieldtype": "Link",
+   "label": "Extra Charges Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "section_break_acct4",
+   "fieldtype": "Section Break",
+   "label": "ERPNext Items"
+  },
+  {
+   "depends_on": "eval:doc.enable_accounting_integration",
+   "description": "ERPNext Item used for room charge lines on Sales Invoices",
+   "fieldname": "room_charge_item",
+   "fieldtype": "Link",
+   "label": "Room Charge Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "column_break_acct4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.enable_accounting_integration",
+   "description": "ERPNext Item used for F&B, laundry, and other extra charges",
+   "fieldname": "extra_charge_item",
+   "fieldtype": "Link",
+   "label": "Extra Charges Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "section_break_acct5",
+   "fieldtype": "Section Break",
+   "label": "Customer Defaults"
+  },
+  {
+   "depends_on": "eval:doc.enable_accounting_integration",
+   "fieldname": "default_customer_group",
+   "fieldtype": "Link",
+   "label": "Default Customer Group",
+   "options": "Customer Group"
+  },
+  {
+   "fieldname": "column_break_acct5",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.enable_accounting_integration",
+   "fieldname": "default_territory",
+   "fieldtype": "Link",
+   "label": "Default Territory",
+   "options": "Territory"
+  },
+  {
+   "fieldname": "section_break_nsgz",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-03-21 09:00:00.000000",
+ "modified": "2026-03-23 08:28:11.318052",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "iHotel Settings",
  "owner": "Administrator",
  "permissions": [
   {
-   "role": "System Manager",
-   "read": 1,
-   "write": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
-   "export": 1,
    "print": 1,
-   "report": 1,
-   "share": 1
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
   },
   {
-   "role": "General Manager",
-   "read": 1,
-   "write": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
-   "export": 1,
    "print": 1,
-   "report": 1,
-   "share": 1
+   "read": 1,
+   "role": "General Manager",
+   "share": 1,
+   "write": 1
   }
  ],
  "row_format": "Dynamic",

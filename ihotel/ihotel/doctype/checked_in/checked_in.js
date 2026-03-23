@@ -11,11 +11,15 @@ frappe.ui.form.on("Checked In", {
 		setup_room_query(frm);
 		setup_rate_type_query(frm);
 
-		// Restrict date pickers to today or later for new documents
+		// Restrict date pickers to today or later unless allow_past_dates is enabled
 		if (frm.is_new()) {
-			const today = frappe.datetime.get_today();
-			frm.set_df_property("expected_check_in",  "options", { minDate: today });
-			frm.set_df_property("expected_check_out", "options", { minDate: today });
+			frappe.db.get_single_value("iHotel Settings", "allow_past_dates").then(allow => {
+				if (!allow) {
+					const today = frappe.datetime.get_today();
+					frm.set_df_property("expected_check_in",  "options", { minDate: today });
+					frm.set_df_property("expected_check_out", "options", { minDate: today });
+				}
+			});
 		}
 
 		// Folio button (only on submitted docs)
@@ -189,7 +193,7 @@ frappe.ui.form.on("Checked In", {
 						frappe.call({
 							method: "ihotel.ihotel.doctype.checked_in.checked_in.move_room",
 							args: {
-								check_in_name: frm.doc.name,
+								checked_in_name: frm.doc.name,
 								new_room: values.new_room,
 								reason: values.reason || "",
 							},
@@ -265,6 +269,10 @@ frappe.ui.form.on("Checked In", {
 		frm.trigger("calculate_total");
 	},
 
+	discount(frm) {
+		frm.trigger("calculate_total");
+	},
+
 	// Calculate check-out from nights (user typed nights directly)
 	nights(frm) {
 		if (frm.doc.nights && frm.doc.nights > 0 && frm.doc.expected_check_in) {
@@ -275,7 +283,11 @@ frappe.ui.form.on("Checked In", {
 			frm.doc.expected_check_out = frappe.datetime.obj_to_str(check_out);
 			frm.refresh_field("expected_check_out");
 			if (frm.doc.room_rate) {
-				frm.doc.total_amount = frm.doc.nights * frm.doc.room_rate;
+				const svcTotal = frm.doc.additional_services_total || 0;
+				const discount = frm.doc.discount || 0;
+				frm.doc.total_amount = Math.max(0,
+					(frm.doc.nights * frm.doc.room_rate) + svcTotal - discount
+				);
 				frm.refresh_field("total_amount");
 			}
 		}
@@ -336,23 +348,29 @@ frappe.ui.form.on("Checked In", {
 				frm.doc.expected_check_in
 			);
 			if (nights > 0) {
-				// Use doc + refresh to avoid triggering the nights event handler
+				const svcTotal = frm.doc.additional_services_total || 0;
+				const discount = frm.doc.discount || 0;
 				frm.doc.nights = nights;
 				frm.refresh_field("nights");
-				frm.doc.total_amount = nights * frm.doc.room_rate;
+				frm.doc.total_amount = Math.max(0,
+					(nights * frm.doc.room_rate) + svcTotal - discount
+				);
 				frm.refresh_field("total_amount");
 			}
 		}
 	}
 });
 
-// Calculate amount for additional services (rate * quantity)
+// Calculate amount for additional services (rate * quantity) and update parent total
 frappe.ui.form.on("Stay Service Item", {
 	rate(frm, cdt, cdn) {
 		calculate_service_amount(frm, cdt, cdn);
 	},
 	quantity(frm, cdt, cdn) {
 		calculate_service_amount(frm, cdt, cdn);
+	},
+	services_remove(frm) {
+		recalc_services_total(frm);
 	}
 });
 
@@ -383,10 +401,19 @@ function setup_room_query(frm) {
 }
 
 function calculate_service_amount(frm, cdt, cdn) {
-	// Get the child row data
 	const row = locals[cdt][cdn];
 	if (row.rate !== undefined && row.quantity !== undefined) {
 		const amount = (row.rate || 0) * (row.quantity || 0);
-		frappe.model.set_value(cdt, cdn, "amount", amount);
+		frappe.model.set_value(cdt, cdn, "amount", amount).then(() => {
+			recalc_services_total(frm);
+		});
 	}
+}
+
+function recalc_services_total(frm) {
+	const rows = frm.doc.additional_services || [];
+	const total = rows.reduce((sum, r) => sum + (r.amount || 0), 0);
+	frm.doc.additional_services_total = Math.round(total * 100) / 100;
+	frm.refresh_field("additional_services_total");
+	frm.trigger("calculate_total");
 }

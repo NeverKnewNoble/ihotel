@@ -3,10 +3,15 @@
 
 frappe.ui.form.on("Reservation", {
 	refresh(frm) {
-		// Restrict date pickers to today or later for new documents
+		// Restrict date pickers to today or later unless allow_past_dates is enabled
 		if (frm.is_new()) {
-			frm.set_df_property("check_in_date",  "options", { minDate: frappe.datetime.get_today() });
-			frm.set_df_property("check_out_date", "options", { minDate: frappe.datetime.get_today() });
+			frappe.db.get_single_value("iHotel Settings", "allow_past_dates").then(allow => {
+				if (!allow) {
+					const today = frappe.datetime.get_today();
+					frm.set_df_property("check_in_date",  "options", { minDate: today });
+					frm.set_df_property("check_out_date", "options", { minDate: today });
+				}
+			});
 		}
 
 		// Room filter by room_type, excluding permanently unavailable rooms
@@ -77,7 +82,7 @@ frappe.ui.form.on("Reservation", {
 				if (!frm.doc.email_address)  frm.set_value("email_address", g.email);
 				if (!frm.doc.phone_number)   frm.set_value("phone_number", g.phone);
 				if (!frm.doc.date_of_birth)  frm.set_value("date_of_birth", g.date_of_birth);
-				if (!frm.doc.country && g.nationality) frm.set_value("company", g.loyalty_tier);
+				if (!frm.doc.country && g.nationality) frm.set_value("country", g.nationality);
 			});
 		}
 	},

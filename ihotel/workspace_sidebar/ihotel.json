@@ -498,5 +498,7 @@
  "name": "iHotel",
  "owner": "Administrator",
  "standard": 0,
- "title": "iHotel"
+ "title": "iHotel",
+ "public": 1,
+ "is_hidden": 0
 }

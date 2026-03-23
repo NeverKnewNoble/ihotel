@@ -208,10 +208,11 @@ class CheckedIn(Document):
         """
         self.validate_restricted_guest()
         self.validate_dates()
+        self.validate_status_transition()
         self.validate_room_availability()
         self.validate_rate_type()
-        self.calculate_total_amount()
         self.calculate_additional_services_amount()
+        self.calculate_total_amount()
         self.validate_additional_services()
 
     def validate_restricted_guest(self):
@@ -227,6 +228,29 @@ class CheckedIn(Document):
                 msg += "<br><b>{0}:</b> {1}".format(_("Reason"), note)
             frappe.throw(msg, title=_("Restricted Guest"))
 
+    def validate_status_transition(self):
+        """Enforce valid status transitions to prevent illegal state jumps."""
+        if self.is_new():
+            return
+        old_status = frappe.db.get_value("Checked In", self.name, "status")
+        if not old_status or old_status == self.status:
+            return
+        valid = {
+            "Reserved":    ["Checked In", "No Show", "Cancelled"],
+            "Checked In":  ["Checked Out"],
+            "Checked Out": [],
+            "No Show":     [],
+            "Cancelled":   [],
+        }
+        allowed = valid.get(old_status, [])
+        if self.status not in allowed:
+            frappe.throw(
+                _("Cannot change status from {0} to {1}. Allowed: {2}").format(
+                    old_status, self.status,
+                    ", ".join(allowed) if allowed else _("None")
+                )
+            )
+
     def validate_dates(self):
         """
         Validate that check-in date is before check-out date.
@@ -236,11 +260,15 @@ class CheckedIn(Document):
             check_out = get_datetime(self.expected_check_out)
             if checked_in >= check_out:
                 frappe.throw(_("Check-in date must be before check-out date"))
+            if (check_out - checked_in).days < 1:
+                frappe.throw(_("Minimum stay is 1 night."))
 
         if self.is_new() and self.expected_check_in:
             from frappe.utils import getdate, nowdate
             if getdate(self.expected_check_in) < getdate(nowdate()):
-                frappe.throw(_("Check-in date cannot be in the past"))
+                allow_past = frappe.db.get_single_value("iHotel Settings", "allow_past_dates")
+                if not allow_past:
+                    frappe.throw(_("Check-in date cannot be in the past"))
 
     def validate_room_availability(self):
         """
@@ -268,7 +296,8 @@ class CheckedIn(Document):
                     )
                 )
 
-        # Check for overlapping reservations (exclude cancelled and checked out)
+        # Check for overlapping stays (runs for both Reserved and Checked In)
+        if self.expected_check_in and self.expected_check_out:
             overlapping_stays = frappe.db.sql("""
                 SELECT name FROM `tabChecked In`
                 WHERE room = %s
@@ -307,31 +336,33 @@ class CheckedIn(Document):
 
     def calculate_total_amount(self):
         """
-        Calculate total amount based on number of nights and room rate.
-        Automatically calculates nights and total amount when dates or rate change.
+        Calculate total amount: (nights × room_rate) + additional_services - discount.
         """
+        from frappe.utils import flt
         if self.expected_check_in and self.expected_check_out and self.room_rate:
             checked_in = get_datetime(self.expected_check_in)
             check_out = get_datetime(self.expected_check_out)
             nights = (check_out - checked_in).days
             if nights > 0:
-                self.total_amount = nights * (self.room_rate or 0)
                 self.nights = nights
+                room_total = nights * flt(self.room_rate)
+                services_total = flt(self.additional_services_total)
+                discount = flt(self.discount)
+                self.total_amount = max(0, room_total + services_total - discount)
             else:
                 self.total_amount = 0
                 self.nights = 0
 
     def calculate_additional_services_amount(self):
         """
-        Calculate amount for each service item in additional_services table.
-        Amount = rate * quantity for each service.
+        Calculate amount for each service row and sum into additional_services_total.
         """
-        if self.additional_services:
-            for service in self.additional_services:
-                if service.rate is not None and service.quantity is not None:
-                    service.amount = (service.rate or 0) * (service.quantity or 0)
-                else:
-                    service.amount = 0
+        from frappe.utils import flt
+        total = 0.0
+        for service in (self.additional_services or []):
+            service.amount = round(flt(service.rate or 0) * flt(service.quantity or 0), 2)
+            total += service.amount
+        self.additional_services_total = round(total, 2)
 
     def validate_additional_services(self):
         """
@@ -367,18 +398,67 @@ class CheckedIn(Document):
         profile.insert(ignore_permissions=True)
         self.db_set("profile", profile.name, update_modified=False)
 
+        from frappe.utils import flt, nowdate
+
         # Post the room charge for the full stay upfront
         if self.room_rate and self.nights:
+            room_rate = flt(self.room_rate)
+            discount = flt(self.discount)
+            if discount > 0:
+                # Post full room charge then a discount line
+                profile.post_charge(
+                    charge_type="Room Charge",
+                    description=_("Room {0} — {1} night(s) @ {2}").format(
+                        self.room or "", self.nights, room_rate
+                    ),
+                    rate=room_rate,
+                    quantity=self.nights,
+                    reference_doctype="Checked In",
+                    reference_name=self.name,
+                )
+                profile.post_charge(
+                    charge_type="Other",
+                    description=_("Discount applied"),
+                    rate=-discount,
+                    quantity=1,
+                    reference_doctype="Checked In",
+                    reference_name=self.name,
+                )
+            else:
+                profile.post_charge(
+                    charge_type="Room Charge",
+                    description=_("Room {0} — {1} night(s) @ {2}").format(
+                        self.room or "", self.nights, room_rate
+                    ),
+                    rate=room_rate,
+                    quantity=self.nights,
+                    reference_doctype="Checked In",
+                    reference_name=self.name,
+                )
+
+        # Post each additional service as a folio charge
+        for svc in (self.additional_services or []):
+            if flt(svc.amount) == 0:
+                continue
             profile.post_charge(
-                charge_type="Room Charge",
-                description=_("Room {0} — {1} night(s) @ {2}").format(
-                    self.room or "", self.nights, self.room_rate
-                ),
-                rate=self.room_rate,
-                quantity=self.nights,
+                charge_type="Additional Service",
+                description=svc.service_type or _("Additional Service"),
+                rate=flt(svc.rate or 0),
+                quantity=flt(svc.quantity or 1),
                 reference_doctype="Checked In",
                 reference_name=self.name,
             )
+
+        # Post deposit as a folio payment if already collected
+        if self.deposit_received and flt(self.deposit_amount) > 0:
+            profile.append("payments", {
+                "date": nowdate(),
+                "payment_method": self.deposit_method or "Cash",
+                "detail": _("Deposit collected at check-in"),
+                "rate": flt(self.deposit_amount),
+                "payment_status": "Paid",
+            })
+            profile.save(ignore_permissions=True)
 
 
 
@@ -395,6 +475,8 @@ class CheckedIn(Document):
         self.sync_room_status()
         if self.status == "Checked Out":
             self.update_guest_stats()
+            if not self.sales_invoice:
+                self._create_erp_invoice()
 
     def update_guest_stats(self):
         """Recompute and persist lifetime stats on the linked Guest profile."""
@@ -503,3 +585,166 @@ class CheckedIn(Document):
             self.mark_room_as_occupied()
         elif self.status == "Checked Out":
             self.mark_room_as_available()
+
+    # ── ERPNext Accounting Integration ────────────────────────────────────────
+
+    def _create_erp_invoice(self):
+        """Create a Sales Invoice (and Payment Entries) in ERPNext on checkout."""
+        from frappe.utils import flt, nowdate
+
+        try:
+            settings = frappe.get_single("iHotel Settings")
+            if not settings.get("enable_accounting_integration"):
+                return
+
+            company = settings.company
+            if not company:
+                frappe.log_error("iHotel: Accounting enabled but no Company set in iHotel Settings")
+                return
+
+            if not self.profile:
+                return
+            profile = frappe.get_doc("iHotel Profile", self.profile)
+            if not profile.get("charges"):
+                return
+
+            customer = self._get_or_create_customer(settings, company)
+            if not customer:
+                return
+
+            invoice = self._build_sales_invoice(profile, customer, company, settings)
+            if not invoice:
+                return
+
+            self.db_set("sales_invoice", invoice.name, update_modified=False)
+
+            if profile.get("payments"):
+                self._create_payment_entries(profile, invoice, customer, company)
+
+            frappe.msgprint(
+                _("Sales Invoice {0} created in ERPNext.").format(
+                    frappe.utils.get_link_to_form("Sales Invoice", invoice.name)
+                ),
+                indicator="green",
+                alert=True,
+            )
+
+        except Exception as e:
+            frappe.log_error(f"iHotel: Error creating Sales Invoice for {self.name}: {str(e)}")
+            frappe.msgprint(
+                _("Checkout complete, but Sales Invoice could not be auto-created. "
+                  "Please create it manually. Error has been logged."),
+                indicator="orange",
+                alert=True,
+            )
+
+    def _get_or_create_customer(self, settings, company):
+        """Return ERPNext Customer name, creating one from the Guest if needed."""
+        if not self.guest:
+            return None
+
+        guest_name = frappe.db.get_value("Guest", self.guest, "guest_name") or self.guest
+
+        # Try exact match first
+        customer = frappe.db.get_value("Customer", {"customer_name": guest_name})
+        if customer:
+            return customer
+
+        try:
+            cust = frappe.get_doc({
+                "doctype": "Customer",
+                "customer_name": guest_name,
+                "customer_type": "Individual",
+                "customer_group": settings.get("default_customer_group") or "All Customer Groups",
+                "territory": settings.get("default_territory") or "All Territories",
+            })
+            cust.insert(ignore_permissions=True)
+            return cust.name
+        except Exception as e:
+            frappe.log_error(f"iHotel: Could not create Customer for guest {self.guest}: {str(e)}")
+            return None
+
+    def _build_sales_invoice(self, profile, customer, company, settings):
+        """Build, insert and submit a Sales Invoice from the folio charges."""
+        from frappe.utils import flt, nowdate
+
+        room_item  = settings.get("room_charge_item")
+        extra_item = settings.get("extra_charge_item")
+        room_acct  = settings.get("room_revenue_account")
+        extra_acct = settings.get("extra_charges_income_account")
+
+        invoice = frappe.new_doc("Sales Invoice")
+        invoice.customer  = customer
+        invoice.company   = company
+        invoice.posting_date = nowdate()
+        invoice.due_date     = nowdate()
+
+        if settings.get("accounts_receivable_account"):
+            invoice.debit_to = settings.accounts_receivable_account
+
+        for charge in profile.charges:
+            is_room = (charge.charge_type == "Room Charge")
+            item_code = room_item if is_room else extra_item
+            if not item_code:
+                continue
+            row = {
+                "item_code": item_code,
+                "item_name": charge.description or charge.charge_type,
+                "description": charge.description or charge.charge_type,
+                "qty": flt(charge.quantity) or 1,
+                "rate": flt(charge.rate),
+            }
+            acct = room_acct if is_room else extra_acct
+            if acct:
+                row["income_account"] = acct
+            invoice.append("items", row)
+
+        if not invoice.get("items"):
+            frappe.log_error(f"iHotel: No items to invoice for stay {self.name} — check Item settings")
+            return None
+
+        invoice.insert(ignore_permissions=True)
+        invoice.submit()
+        return invoice
+
+    def _create_payment_entries(self, profile, invoice, customer, company):
+        """Create a Payment Entry for each folio payment, allocated to the invoice."""
+        from frappe.utils import flt, nowdate
+
+        _mode_map = {
+            "Cash": "Cash",
+            "Visa": "Credit Card",
+            "Mastercard": "Credit Card",
+            "Amex": "Credit Card",
+            "Bank Transfer": "Bank Transfer",
+            "Cheque": "Cheque",
+            "City Ledger": "Bank Transfer",
+            "Complimentary": "Cash",
+        }
+
+        for payment in profile.payments:
+            amount = flt(payment.rate)
+            if not amount:
+                continue
+            try:
+                mode = _mode_map.get(payment.payment_method, "Cash")
+                pe = frappe.new_doc("Payment Entry")
+                pe.payment_type     = "Receive"
+                pe.company          = company
+                pe.mode_of_payment  = mode
+                pe.posting_date     = payment.date or nowdate()
+                pe.party_type       = "Customer"
+                pe.party            = customer
+                pe.paid_amount      = amount
+                pe.received_amount  = amount
+                pe.append("references", {
+                    "reference_doctype": "Sales Invoice",
+                    "reference_name": invoice.name,
+                    "allocated_amount": amount,
+                })
+                pe.insert(ignore_permissions=True)
+                pe.submit()
+            except Exception as e:
+                frappe.log_error(
+                    f"iHotel: Could not create Payment Entry for stay {self.name}: {str(e)}"
+                )

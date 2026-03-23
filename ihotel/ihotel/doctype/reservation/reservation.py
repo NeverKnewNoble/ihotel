@@ -18,6 +18,7 @@ class Reservation(Document):
 		self.validate_room_availability()
 		self.validate_guest_capacity()
 		self.validate_status_transition()
+		self.validate_payment_method()
 		self.sync_guest_details()
 
 	def validate_restricted_guest(self):
@@ -40,7 +41,9 @@ class Reservation(Document):
 
 		if self.is_new() and self.check_in_date:
 			if getdate(self.check_in_date) < getdate(nowdate()):
-				frappe.throw(_("Check-in date cannot be in the past"))
+				allow_past = frappe.db.get_single_value("iHotel Settings", "allow_past_dates")
+				if not allow_past:
+					frappe.throw(_("Check-in date cannot be in the past"))
 
 	def calculate_days(self):
 		if self.check_in_date and self.check_out_date:
@@ -156,6 +159,13 @@ class Reservation(Document):
 			self.cancellation_fee = round((self.total_charges or 0) * pct, 2)
 		else:
 			self.cancellation_fee = 0
+
+	def validate_payment_method(self):
+		"""Require card details when payment method is Credit Card."""
+		if self.payment_method in ("Visa", "Mastercard", "Amex", "Credit Card"):
+			if not self.credit_card_type:
+				frappe.throw(_("Please specify the Credit Card Type for payment method {0}.").format(
+					self.payment_method))
 
 	def sync_guest_details(self):
 		"""If a Guest profile is selected, auto-fill contact fields."""
