@@ -8,7 +8,6 @@ app_license = "mit"
 # Fixtures
 # ------------------
 fixtures = [
-    {"dt": "Workspace Sidebar", "filters": [["app", "=", "ihotel"]]},
 	{"doctype": "Business Source Type", "filters": [["module" , "in" , ("ihotel" )]]},
 	{"doctype": "Business Channel Category", "filters": [["module" , "in" , ("ihotel" )]]},
 	{"doctype": "Notification", "filters": [["name", "=", "Reservation Confirmation Letter"]]},
@@ -22,15 +21,15 @@ fixtures = [
 
 
 # Each item in the list will be shown as an app in the apps page
-add_to_apps_screen = [
-	{
-		"name": "ihotel",
-		"logo": "/assets/ihotel/logo.png",
-		"title": "iHotel",
-		"route": "/ihotel",
-		# "has_permission": "ihotel.api.permission.has_app_permission"
-	}
-]
+# add_to_apps_screen = [
+# 	{
+# 		"name": "ihotel",
+# 		"logo": "/assets/ihotel/logo.png",
+# 		"title": "iHotel",
+# 		"route": "check/ihotel",
+# 		# "has_permission": "ihotel.api.permission.has_app_permission"
+# 	}
+# ]
 
 # app_include_icons = [
 #     "ihotel/public/icons/my_custom_icons.svg"

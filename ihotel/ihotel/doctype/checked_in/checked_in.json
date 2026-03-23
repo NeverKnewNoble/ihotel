@@ -29,6 +29,8 @@
   "room_rate",
   "column_break_osgw",
   "total_amount",
+  "discount",
+  "additional_services_total",
   "deposit_section",
   "deposit_amount",
   "deposit_received",
@@ -48,6 +50,7 @@
   "additional_services",
   "folio_tab",
   "profile",
+  "sales_invoice",
   "column_break_surq",
   "payment_status",
   "amended_from"
@@ -59,8 +62,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Guest",
-   "options": "Guest",
-   "unique": 1
+   "options": "Guest"
   },
   {
    "fieldname": "section_break_uvsf",
@@ -304,6 +306,28 @@
   {
    "fieldname": "column_break_osgw",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "options": "Sales Invoice",
+   "read_only": 1,
+   "allow_on_submit": 1,
+   "description": "ERPNext Sales Invoice created on checkout"
+  },
+  {
+   "fieldname": "discount",
+   "fieldtype": "Currency",
+   "label": "Discount",
+   "description": "Discount to be subtracted from the total room charges"
+  },
+  {
+   "fieldname": "additional_services_total",
+   "fieldtype": "Currency",
+   "label": "Additional Services Total",
+   "read_only": 1,
+   "description": "Sum of all additional services \u2014 auto-calculated"
   }
  ],
  "grid_page_length": 50,

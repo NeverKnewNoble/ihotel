@@ -26,16 +26,19 @@ class HousekeepingTask(Document):
 
     def update_task_status(self):
         """
-        Auto-update task status based on assigned_date and cleaned_date.
-        Status priority: Completed > In Progress > Pending
+        Auto-set status on new tasks; validate required fields when completing.
+        Only auto-sets when status is blank — never overwrites a manual status.
         """
         if not self.status:
-            if self.cleaned_date:
+            if self.cleaned_date or self.actual_end_time:
                 self.status = "Completed"
-            elif self.assigned_date:
+            elif self.assigned_date or self.actual_start_time:
                 self.status = "In Progress"
             else:
                 self.status = "Pending"
+
+        if self.status == "Completed" and not (self.cleaned_date or self.actual_end_time):
+            frappe.throw(_("Please set the Completion Date/Time before marking this task as Completed."))
 
     def on_update(self):
         """

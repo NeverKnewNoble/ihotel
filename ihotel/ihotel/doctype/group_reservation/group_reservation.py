@@ -41,6 +41,26 @@ class GroupReservation(Document):
 		if self.status == "Tentative":
 			self.db_set("status", "Confirmed")
 
+	def on_update(self):
+		"""Cascade cancellation to all generated child reservations."""
+		if self.status == "Cancelled":
+			child_reservations = frappe.get_all(
+				"Reservation",
+				filters={"group_reservation": self.name, "status": ["!=", "cancelled"]},
+				pluck="name",
+			)
+			for res_name in child_reservations:
+				frappe.db.set_value("Reservation", res_name, "status", "cancelled",
+					update_modified=False)
+			if child_reservations:
+				frappe.msgprint(
+					_("{0} reservation(s) cancelled along with this group.").format(
+						len(child_reservations)
+					),
+					indicator="orange",
+					alert=True,
+				)
+
 
 @frappe.whitelist()
 def generate_reservations(group_reservation_name):
