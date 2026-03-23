@@ -46,21 +46,8 @@
   "cancellation_deadline_hours",
   "cancellation_policy_notes",
   "taxes_tab",
-  "ghana_taxes_section",
-  "apply_vat",
-  "vat_rate",
-  "apply_nhil",
-  "nhil_rate",
-  "column_break_tax1",
-  "apply_getfund",
-  "getfund_rate",
-  "apply_covid_levy",
-  "covid_levy_rate",
-  "column_break_tax2",
-  "apply_tourism_levy",
-  "tourism_levy_rate",
-  "additional_taxes_section",
-  "additional_taxes",
+  "tax_schedule_section",
+  "tax_schedule",
   "effective_tax_section",
   "effective_tax_rate",
   "long_info_tab",
@@ -337,96 +324,23 @@
    "label": "Taxes"
   },
   {
-   "fieldname": "ghana_taxes_section",
+   "fieldname": "effective_tax_rate",
+   "fieldtype": "Percent",
+   "label": "Total Effective Tax Rate (%)",
+   "read_only": 1,
+   "description": "Auto-calculated from all enabled taxes above."
+  },
+  {
+   "fieldname": "tax_schedule_section",
    "fieldtype": "Section Break",
-   "label": "Ghana Standard Taxes"
+   "label": "Tax Schedule"
   },
   {
-   "default": "0",
-   "fieldname": "apply_vat",
-   "fieldtype": "Check",
-   "label": "Apply VAT (15%)"
-  },
-  {
-   "default": "15",
-   "depends_on": "eval:doc.apply_vat == 1",
-   "fieldname": "vat_rate",
-   "fieldtype": "Percent",
-   "label": "VAT Rate (%)"
-  },
-  {
-   "default": "0",
-   "fieldname": "apply_nhil",
-   "fieldtype": "Check",
-   "label": "Apply NHIL (2.5%)",
-   "description": "National Health Insurance Levy"
-  },
-  {
-   "default": "2.5",
-   "depends_on": "eval:doc.apply_nhil == 1",
-   "fieldname": "nhil_rate",
-   "fieldtype": "Percent",
-   "label": "NHIL Rate (%)"
-  },
-  {
-   "fieldname": "column_break_tax1",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "0",
-   "fieldname": "apply_getfund",
-   "fieldtype": "Check",
-   "label": "Apply GETFund Levy (2.5%)",
-   "description": "Ghana Education Trust Fund Levy"
-  },
-  {
-   "default": "2.5",
-   "depends_on": "eval:doc.apply_getfund == 1",
-   "fieldname": "getfund_rate",
-   "fieldtype": "Percent",
-   "label": "GETFund Rate (%)"
-  },
-  {
-   "default": "0",
-   "fieldname": "apply_covid_levy",
-   "fieldtype": "Check",
-   "label": "Apply COVID-19 Health Recovery Levy (1%)"
-  },
-  {
-   "default": "1",
-   "depends_on": "eval:doc.apply_covid_levy == 1",
-   "fieldname": "covid_levy_rate",
-   "fieldtype": "Percent",
-   "label": "COVID-19 Levy Rate (%)"
-  },
-  {
-   "fieldname": "column_break_tax2",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "0",
-   "fieldname": "apply_tourism_levy",
-   "fieldtype": "Check",
-   "label": "Apply Tourism Levy (1%)",
-   "description": "Applicable to hospitality businesses in Ghana"
-  },
-  {
-   "default": "1",
-   "depends_on": "eval:doc.apply_tourism_levy == 1",
-   "fieldname": "tourism_levy_rate",
-   "fieldtype": "Percent",
-   "label": "Tourism Levy Rate (%)"
-  },
-  {
-   "fieldname": "additional_taxes_section",
-   "fieldtype": "Section Break",
-   "label": "Additional / Custom Taxes"
-  },
-  {
-   "fieldname": "additional_taxes",
+   "fieldname": "tax_schedule",
    "fieldtype": "Table",
-   "label": "Additional Taxes",
-   "options": "Rate Tax"
+   "label": "Tax Schedule",
+   "options": "Rate Tax Schedule",
+   "description": "Define taxes with optional effective date ranges. Use 'Load from ERPXpand' to import tax accounts, or add rows manually."
   },
   {
    "fieldname": "effective_tax_section",
@@ -438,7 +352,7 @@
    "fieldtype": "Percent",
    "label": "Total Effective Tax Rate (%)",
    "read_only": 1,
-   "description": "Auto-calculated from all enabled taxes above."
+   "description": "Sum of all currently active Percentage taxes (where today falls within From/To dates)."
   }
  ],
  "grid_page_length": 50,

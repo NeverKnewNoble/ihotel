@@ -586,10 +586,10 @@ class CheckedIn(Document):
         elif self.status == "Checked Out":
             self.mark_room_as_available()
 
-    # ── ERPNext Accounting Integration ────────────────────────────────────────
+    # ── ERPXpand Accounting Integration ────────────────────────────────────────
 
     def _create_erp_invoice(self):
-        """Create a Sales Invoice (and Payment Entries) in ERPNext on checkout."""
+        """Create a Sales Invoice (and Payment Entries) in ERPXpand on checkout."""
         from frappe.utils import flt, nowdate
 
         try:
@@ -622,7 +622,7 @@ class CheckedIn(Document):
                 self._create_payment_entries(profile, invoice, customer, company)
 
             frappe.msgprint(
-                _("Sales Invoice {0} created in ERPNext.").format(
+                _("Sales Invoice {0} created in ERPXpand.").format(
                     frappe.utils.get_link_to_form("Sales Invoice", invoice.name)
                 ),
                 indicator="green",
@@ -639,7 +639,7 @@ class CheckedIn(Document):
             )
 
     def _get_or_create_customer(self, settings, company):
-        """Return ERPNext Customer name, creating one from the Guest if needed."""
+        """Return ERPXpand Customer name, creating one from the Guest if needed."""
         if not self.guest:
             return None
 

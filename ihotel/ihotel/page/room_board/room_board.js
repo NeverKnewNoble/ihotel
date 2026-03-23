@@ -376,7 +376,7 @@ class RoomBoard {
 					fieldname: "room_rate",
 					label: "Room Rate",
 					reqd: 1,
-					default: room.rack_rate || 0,
+					default: 0,
 				},
 			],
 			primary_action_label: "Check In",

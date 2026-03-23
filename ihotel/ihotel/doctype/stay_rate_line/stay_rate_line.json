@@ -1,0 +1,72 @@
+{
+ "actions": [],
+ "creation": "2026-03-23 10:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "rate_type",
+  "room_type",
+  "rate_column",
+  "description",
+  "rate",
+  "amount"
+ ],
+ "fields": [
+  {
+   "fieldname": "rate_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Rate Type",
+   "options": "Rate Type",
+   "reqd": 1
+  },
+  {
+   "fieldname": "room_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Room Type",
+   "options": "Room Type"
+  },
+  {
+   "fieldname": "rate_column",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Rate Column",
+   "options": "\nSingle / Base Rate\nDouble Rate\nTriple Rate\nQuad Rate\nExtra Adult Charge\nExtra Child Charge\nBed Only Rate\nWeekday Rate\nWeekend Rate\nDay Use Rate",
+   "description": "Which rate column from the Rate Schedule to use"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Description",
+   "read_only": 1
+  },
+  {
+   "fieldname": "rate",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Rate",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Amount"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-23 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "iHotel",
+ "name": "Stay Rate Line",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

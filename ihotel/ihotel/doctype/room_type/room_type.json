@@ -8,7 +8,6 @@
  "field_order": [
   "room_type_name",
   "description",
-  "rack_rate",
   "maximum_capacity",
   "amenities"
  ],
@@ -23,11 +22,6 @@
    "fieldname": "description",
    "fieldtype": "Text",
    "label": "Description"
-  },
-  {
-   "fieldname": "rack_rate",
-   "fieldtype": "Currency",
-   "label": "Rack Rate"
   },
   {
    "fieldname": "maximum_capacity",

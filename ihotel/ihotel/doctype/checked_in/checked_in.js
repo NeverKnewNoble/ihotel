@@ -213,15 +213,7 @@ frappe.ui.form.on("Checked In", {
 
 	// Auto-fetch room rate from room type and update room query filter
 	room_type(frm) {
-		// Fetch room rate from room type
 		if (frm.doc.room_type) {
-			frappe.db.get_value("Room Type", frm.doc.room_type, "rack_rate")
-				.then(r => {
-					if (r.message && r.message.rack_rate) {
-						frm.set_value("room_rate", r.message.rack_rate);
-						frm.trigger("calculate_total");
-					}
-				});
 		}
 
 		setup_room_query(frm);
@@ -273,22 +265,26 @@ frappe.ui.form.on("Checked In", {
 		frm.trigger("calculate_total");
 	},
 
+	adults(frm)        { apply_cached_rate(frm); },
+	children(frm)      { apply_cached_rate(frm); },
+	rate_room_type(frm){ apply_cached_rate(frm); },
+
 	// Calculate check-out from nights (user typed nights directly)
 	nights(frm) {
 		if (frm.doc.nights && frm.doc.nights > 0 && frm.doc.expected_check_in) {
 			const check_in = frappe.datetime.str_to_obj(frm.doc.expected_check_in);
 			const check_out = new Date(check_in);
 			check_out.setDate(check_out.getDate() + frm.doc.nights);
-			// Use doc + refresh to avoid re-triggering expected_check_out event
+			// Use doc + refresh to avoid re-triggering expected_check_out event loop
 			frm.doc.expected_check_out = frappe.datetime.obj_to_str(check_out);
 			frm.refresh_field("expected_check_out");
 			if (frm.doc.room_rate) {
+				const rate_lines_total = (frm.doc.rate_lines || []).reduce((s, r) => s + (r.amount || 0), 0);
 				const svcTotal = frm.doc.additional_services_total || 0;
 				const discount = frm.doc.discount || 0;
-				frm.doc.total_amount = Math.max(0,
-					(frm.doc.nights * frm.doc.room_rate) + svcTotal - discount
-				);
-				frm.refresh_field("total_amount");
+				frm.set_value("total_amount", Math.max(0,
+					(frm.doc.nights * frm.doc.room_rate) + rate_lines_total + svcTotal - discount
+				));
 			}
 		}
 	},
@@ -296,9 +292,23 @@ frappe.ui.form.on("Checked In", {
 	rate_type(frm) {
 		if (!frm.doc.rate_type) {
 			frm.set_intro("");
+			frm._rate_cache = null;
 			return;
 		}
 		frappe.db.get_doc("Rate Type", frm.doc.rate_type).then((rate) => {
+			// Cache the rate doc so adults/children/rate_room_type can use it directly
+			frm._rate_cache = rate;
+
+			// --- filter rate_room_type to room types present in this rate's schedule ---
+			const sched_room_types = [...new Set(
+				(rate.rate_schedule || []).map(r => r.room_type).filter(Boolean)
+			)];
+			if (sched_room_types.length) {
+				frm.set_query("rate_room_type", () => ({
+					filters: { name: ["in", sched_room_types] }
+				}));
+			}
+
 			// --- indicators ---
 			let indicators = [];
 			if (rate.includes_breakfast) indicators.push("Breakfast included");
@@ -306,33 +316,12 @@ frappe.ui.form.on("Checked In", {
 			if (rate.includes_taxes)     indicators.push("Taxes included");
 			frm.set_intro(indicators.length ? indicators.join(" | ") : "", "blue");
 
-			// --- rate autofill ---
-			let resolved_rate = null;
-			const today = frappe.datetime.get_today();
-			const room_type = frm.doc.room_type || "";
-
-			if (rate.rate_schedule && rate.rate_schedule.length) {
-				// Find the best matching schedule row
-				for (const row of rate.rate_schedule) {
-					const type_match = !row.room_type || row.room_type === room_type;
-					const in_range   = (!row.from_date || row.from_date <= today) &&
-					                   (!row.to_date   || row.to_date   >= today);
-					if (type_match && in_range && row.rate) {
-						resolved_rate = row.rate;
-						break;
-					}
-				}
-			}
-
-			if (!resolved_rate && rate.base_rate) {
-				resolved_rate = rate.base_rate;
-			}
-
-			if (resolved_rate) {
-				frm.set_value("room_rate", resolved_rate);
-				frm.trigger("calculate_total");
-			}
+			apply_cached_rate(frm);
 		});
+	},
+
+	rate_lines_remove(frm) {
+		frm.trigger("calculate_total");
 	},
 
 	color(frm) {
@@ -342,20 +331,20 @@ frappe.ui.form.on("Checked In", {
 	},
 
 	calculate_total(frm) {
-		if (frm.doc.expected_check_in && frm.doc.expected_check_out && frm.doc.room_rate) {
+		if (frm.doc.expected_check_in && frm.doc.expected_check_out) {
 			const nights = frappe.datetime.get_day_diff(
 				frm.doc.expected_check_out,
 				frm.doc.expected_check_in
 			);
 			if (nights > 0) {
-				const svcTotal = frm.doc.additional_services_total || 0;
-				const discount = frm.doc.discount || 0;
-				frm.doc.nights = nights;
-				frm.refresh_field("nights");
-				frm.doc.total_amount = Math.max(0,
-					(nights * frm.doc.room_rate) + svcTotal - discount
-				);
-				frm.refresh_field("total_amount");
+				const room_rate       = frm.doc.room_rate || 0;
+				const rate_lines_total = (frm.doc.rate_lines || []).reduce((s, r) => s + (r.amount || 0), 0);
+				const svcTotal        = frm.doc.additional_services_total || 0;
+				const discount        = frm.doc.discount || 0;
+				frm.set_value("nights", nights);
+				frm.set_value("total_amount", Math.max(0,
+					(nights * room_rate) + rate_lines_total + svcTotal - discount
+				));
 			}
 		}
 	}
@@ -416,4 +405,98 @@ function recalc_services_total(frm) {
 	frm.doc.additional_services_total = Math.round(total * 100) / 100;
 	frm.refresh_field("additional_services_total");
 	frm.trigger("calculate_total");
+}
+
+frappe.ui.form.on("Stay Rate Line", {
+	rate_type(frm, cdt, cdn)  { fetch_rate_line(frm, cdt, cdn); },
+	room_type(frm, cdt, cdn)  { fetch_rate_line(frm, cdt, cdn); },
+	rate_column(frm, cdt, cdn){ fetch_rate_line(frm, cdt, cdn); },
+	amount(frm, cdt, cdn)     { frm.trigger("calculate_total"); },
+});
+
+// Maps the Rate Column label to its field name in Rate Schedule
+const RATE_COLUMN_MAP = {
+	"Single / Base Rate": "rate",
+	"Double Rate":        "double_rate",
+	"Triple Rate":        "triple_rate",
+	"Quad Rate":          "quad_rate",
+	"Extra Adult Charge": "extra_adult",
+	"Extra Child Charge": "extra_child",
+	"Bed Only Rate":      "bed_only_rate",
+	"Weekday Rate":       "weekday_rate",
+	"Weekend Rate":       "weekend_rate",
+	"Day Use Rate":       "bed_and_day_use",
+};
+
+function fetch_rate_line(frm, cdt, cdn) {
+	const row = locals[cdt][cdn];
+	if (!row.rate_type) return;
+	frappe.db.get_doc("Rate Type", row.rate_type).then((rate_doc) => {
+		const today = frappe.datetime.get_today();
+		const desc  = rate_doc.rate_type_name || rate_doc.name;
+		// Priority: row's own room_type → rate_room_type → room_type → generic
+		const preferred = row.room_type || frm.doc.rate_room_type || "";
+		const fallback  = frm.doc.room_type || "";
+		let resolved = 0;
+
+		const schedule = rate_doc.rate_schedule || [];
+		const in_range = (s) =>
+			(!s.from_date || s.from_date <= today) && (!s.to_date || s.to_date >= today);
+
+		const matched = (preferred && schedule.find(s => s.room_type === preferred && in_range(s)))
+			|| (fallback && schedule.find(s => s.room_type === fallback  && in_range(s)))
+			|| schedule.find(s => !s.room_type && in_range(s));
+
+		if (matched) {
+			if (row.rate_column && RATE_COLUMN_MAP[row.rate_column]) {
+				resolved = matched[RATE_COLUMN_MAP[row.rate_column]] || 0;
+			} else {
+				const adults = frm.doc.adults || 1;
+				const children = frm.doc.children || 0;
+				resolved = resolve_schedule_rate(rate_doc, preferred, fallback, today, adults, children);
+			}
+		} else {
+			resolved = rate_doc.base_rate || 0;
+		}
+
+		frappe.model.set_value(cdt, cdn, "description", desc);
+		frappe.model.set_value(cdt, cdn, "rate", resolved);
+		frappe.model.set_value(cdt, cdn, "amount", resolved);
+	});
+}
+
+// Uses the cached rate doc (set when rate_type is selected) to immediately
+// recalculate room_rate from current adults/children/rate_room_type values.
+function apply_cached_rate(frm) {
+	if (!frm._rate_cache || !frm.doc.rate_type) return;
+	const resolved = resolve_schedule_rate(
+		frm._rate_cache,
+		frm.doc.rate_room_type || "",
+		frm.doc.room_type || "",
+		frappe.datetime.get_today(),
+		frm.doc.adults || 1,
+		frm.doc.children || 0
+	);
+	frm.set_value("room_rate", resolved);
+	frm.trigger("calculate_total");
+}
+
+// Returns the rate from the best-matching Rate Schedule row, applying
+// double_rate when adults > 1 and adding extra_child * children.
+// Match priority: preferred_rt (rate_room_type) → fallback_rt (room_type) → generic → base_rate
+function resolve_schedule_rate(rate_doc, preferred_rt, fallback_rt, today, adults, children) {
+	const schedule = rate_doc.rate_schedule || [];
+	const in_range = (row) =>
+		(!row.from_date || row.from_date <= today) &&
+		(!row.to_date   || row.to_date   >= today);
+
+	let matched = (preferred_rt && schedule.find(r => r.room_type === preferred_rt && in_range(r)))
+		|| (fallback_rt  && schedule.find(r => r.room_type === fallback_rt  && in_range(r)))
+		|| schedule.find(r => !r.room_type && in_range(r));
+
+	if (!matched) return rate_doc.base_rate || 0;
+
+	const base = (adults > 1 && matched.double_rate) ? matched.double_rate : (matched.rate || rate_doc.base_rate || 0);
+	const child_supplement = (children > 0 && matched.extra_child) ? matched.extra_child * children : 0;
+	return base + child_supplement;
 }

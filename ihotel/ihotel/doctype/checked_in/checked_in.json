@@ -2,8 +2,8 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "field:guest",
- "default_view": "Calendar",
  "creation": "2025-11-13 23:02:20.996524",
+ "default_view": "Calendar",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -23,24 +23,27 @@
   "nights",
   "column_break_vvzc",
   "business_source",
+  "section_break_pax",
+  "adults",
+  "column_break_pax2",
+  "children",
   "section_break_fhmg",
   "rate_type",
+  "rate_room_type",
   "column_break_nggu",
   "room_rate",
   "column_break_osgw",
   "total_amount",
   "discount",
   "additional_services_total",
+  "section_break_rate_lines",
+  "rate_lines",
   "deposit_section",
   "deposit_amount",
   "deposit_received",
   "column_break_dep2",
   "deposit_method",
   "deposit_reference",
-  "section_break_pax",
-  "adults",
-  "column_break_pax2",
-  "children",
   "guest_services_section",
   "do_not_disturb",
   "make_up_room",
@@ -62,7 +65,8 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Guest",
-   "options": "Guest"
+   "options": "Guest",
+   "unique": 1
   },
   {
    "fieldname": "section_break_uvsf",
@@ -139,6 +143,13 @@
    "fieldtype": "Link",
    "label": "Rate Type",
    "options": "Rate Type"
+  },
+  {
+   "description": "Room type used to look up the rate from the Rate Schedule. Defaults to the booked room type.",
+   "fieldname": "rate_room_type",
+   "fieldtype": "Link",
+   "label": "Room Type (Rate)",
+   "options": "Room Type"
   },
   {
    "fieldname": "business_source",
@@ -308,33 +319,45 @@
    "fieldtype": "Column Break"
   },
   {
+   "allow_on_submit": 1,
+   "description": "ERPXpand Sales Invoice created on checkout",
    "fieldname": "sales_invoice",
    "fieldtype": "Link",
    "label": "Sales Invoice",
    "options": "Sales Invoice",
-   "read_only": 1,
-   "allow_on_submit": 1,
-   "description": "ERPNext Sales Invoice created on checkout"
+   "read_only": 1
   },
   {
+   "description": "Discount to be subtracted from the total room charges",
    "fieldname": "discount",
    "fieldtype": "Currency",
-   "label": "Discount",
-   "description": "Discount to be subtracted from the total room charges"
+   "label": "Discount"
   },
   {
+   "description": "Sum of all additional services \u2014 auto-calculated",
    "fieldname": "additional_services_total",
    "fieldtype": "Currency",
    "label": "Additional Services Total",
-   "read_only": 1,
-   "description": "Sum of all additional services \u2014 auto-calculated"
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_rate_lines",
+   "fieldtype": "Section Break",
+   "label": "Additional Rates"
+  },
+  {
+   "description": "Add extra rate types from Rate Schedule (e.g. packages, supplements)",
+   "fieldname": "rate_lines",
+   "fieldtype": "Table",
+   "label": "Additional Rates",
+   "options": "Stay Rate Line"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-18 16:13:57.906438",
+ "modified": "2026-03-23 09:39:20.907111",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Checked In",
@@ -342,57 +365,57 @@
  "owner": "Administrator",
  "permissions": [
   {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
    "role": "System Manager",
-   "read": 1,
-   "write": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
+   "read": 1,
    "report": 1,
-   "share": 1
-  },
-  {
    "role": "General Manager",
-   "read": 1,
-   "write": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
    "create": 1,
-   "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
+   "read": 1,
    "report": 1,
-   "share": 1,
-   "submit": 1,
-   "cancel": 1,
-   "amend": 1
-  },
-  {
    "role": "Front Desk Agent",
-   "read": 1,
-   "write": 1,
-   "create": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "report": 1,
    "share": 1,
    "submit": 1,
-   "cancel": 1,
-   "amend": 1
+   "write": 1
   },
   {
-   "role": "Revenue Manager",
-   "read": 1,
    "export": 1,
-   "report": 1
+   "read": 1,
+   "report": 1,
+   "role": "Revenue Manager"
   },
   {
-   "role": "Hotel Accountant",
-   "read": 1,
    "export": 1,
-   "report": 1
+   "read": 1,
+   "report": 1,
+   "role": "Hotel Accountant"
   }
  ],
  "row_format": "Dynamic",

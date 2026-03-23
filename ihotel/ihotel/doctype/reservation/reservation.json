@@ -66,6 +66,7 @@
   "rate_details_tab",
   "rate_details_section",
   "rate_type",
+  "rate_room_type",
   "section_break_hxvt",
   "rent",
   "discount",
@@ -77,6 +78,8 @@
   "deposit",
   "total_charges",
   "cancellation_fee",
+  "section_break_rate_lines",
+  "rate_lines",
   "guarantee_and_payment_tab",
   "guarantee_section",
   "guarantee_type",
@@ -224,6 +227,13 @@
    "options": "Rate Type"
   },
   {
+   "fieldname": "rate_room_type",
+   "fieldtype": "Link",
+   "label": "Room Type (Rate)",
+   "options": "Room Type",
+   "description": "Room type used to look up the rate from the Rate Schedule. Defaults to the booked room type."
+  },
+  {
    "fieldname": "section_break_hxvt",
    "fieldtype": "Section Break"
   },
@@ -280,6 +290,18 @@
    "fieldtype": "Currency",
    "label": "Cancellation Fee",
    "read_only": 1
+  },
+  {
+   "fieldname": "section_break_rate_lines",
+   "fieldtype": "Section Break",
+   "label": "Additional Rates"
+  },
+  {
+   "fieldname": "rate_lines",
+   "fieldtype": "Table",
+   "label": "Additional Rates",
+   "options": "Stay Rate Line",
+   "description": "Add extra rate types from Rate Schedule (e.g. packages, supplements)"
   },
   {
    "fieldname": "guarantee_section",

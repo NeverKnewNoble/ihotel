@@ -396,11 +396,11 @@
   {
    "fieldname": "section_break_acct",
    "fieldtype": "Section Break",
-   "label": "ERPNext Integration"
+   "label": "ERPXpand Integration"
   },
   {
    "default": "0",
-   "description": "When enabled, a Sales Invoice is automatically created in ERPNext when a guest checks out, and Payment Entries are created for folio payments.",
+   "description": "When enabled, a Sales Invoice is automatically created in ERPXpand when a guest checks out, and Payment Entries are created for folio payments.",
    "fieldname": "enable_accounting_integration",
    "fieldtype": "Check",
    "label": "Create Sales Invoice & Payment Entry on Checkout"
@@ -457,11 +457,11 @@
   {
    "fieldname": "section_break_acct4",
    "fieldtype": "Section Break",
-   "label": "ERPNext Items"
+   "label": "ERPXpand Items"
   },
   {
    "depends_on": "eval:doc.enable_accounting_integration",
-   "description": "ERPNext Item used for room charge lines on Sales Invoices",
+   "description": "ERPXpand Item used for room charge lines on Sales Invoices",
    "fieldname": "room_charge_item",
    "fieldtype": "Link",
    "label": "Room Charge Item",
@@ -473,7 +473,7 @@
   },
   {
    "depends_on": "eval:doc.enable_accounting_integration",
-   "description": "ERPNext Item used for F&B, laundry, and other extra charges",
+   "description": "ERPXpand Item used for F&B, laundry, and other extra charges",
    "fieldname": "extra_charge_item",
    "fieldtype": "Link",
    "label": "Extra Charges Item",

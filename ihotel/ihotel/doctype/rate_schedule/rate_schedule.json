@@ -16,6 +16,7 @@
   "quad_rate",
   "extra_adult",
   "extra_child",
+  "bed_only_rate",
   "column_break_rs2",
   "weekday_rate",
   "weekend_rate",
@@ -27,6 +28,7 @@
  ],
  "fields": [
   {
+   "columns": 4,
    "fieldname": "code",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -34,6 +36,7 @@
    "reqd": 1
   },
   {
+   "columns": 4,
    "fieldname": "room_type",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -42,24 +45,28 @@
    "reqd": 1
   },
   {
+   "columns": 4,
    "fieldname": "from_date",
    "fieldtype": "Date",
    "in_list_view": 1,
    "label": "From Date"
   },
   {
+   "columns": 4,
    "fieldname": "to_date",
    "fieldtype": "Date",
    "in_list_view": 1,
    "label": "To Date"
   },
   {
+   "columns": 4,
    "fieldname": "rate",
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Single / Base Rate"
   },
   {
+   "columns": 4,
    "fieldname": "double_rate",
    "fieldtype": "Currency",
    "in_list_view": 1,
@@ -70,22 +77,26 @@
    "fieldtype": "Column Break"
   },
   {
+   "columns": 4,
    "fieldname": "triple_rate",
    "fieldtype": "Currency",
    "label": "Triple Rate"
   },
   {
+   "columns": 4,
    "fieldname": "quad_rate",
    "fieldtype": "Currency",
    "label": "Quad Rate"
   },
   {
+   "columns": 4,
    "fieldname": "extra_adult",
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Extra Adult Charge"
   },
   {
+   "columns": 4,
    "fieldname": "extra_child",
    "fieldtype": "Currency",
    "in_list_view": 1,
@@ -96,6 +107,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "columns": 4,
    "description": "Override base rate for weekday stays. Leave blank to use Single / Base Rate.",
    "fieldname": "weekday_rate",
    "fieldtype": "Currency",
@@ -103,6 +115,7 @@
    "label": "Weekday Rate"
   },
   {
+   "columns": 4,
    "description": "Override base rate for weekend stays. Leave blank to use Single / Base Rate.",
    "fieldname": "weekend_rate",
    "fieldtype": "Currency",
@@ -110,86 +123,54 @@
    "label": "Weekend Rate"
   },
   {
+   "columns": 4,
    "description": "Rate for guests using the room during the day without an overnight stay.",
    "fieldname": "bed_and_day_use",
    "fieldtype": "Currency",
    "in_list_view": 1,
-   "label": "Bed & Day Use Rate"
+   "label": "Day Use Rate"
   },
   {
    "fieldname": "column_break_disc",
    "fieldtype": "Column Break"
   },
   {
+   "columns": 4,
    "fieldname": "discount_1",
    "fieldtype": "Percent",
    "in_list_view": 1,
    "label": "Discount 1 (%)"
   },
   {
+   "columns": 4,
    "fieldname": "discount_2",
    "fieldtype": "Percent",
    "in_list_view": 1,
    "label": "Discount 2 (%)"
   },
   {
+   "columns": 4,
    "fieldname": "discount_3",
    "fieldtype": "Percent",
    "in_list_view": 1,
    "label": "Discount 3 (%)"
+  },
+  {
+   "columns": 4,
+   "fieldname": "bed_only_rate",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Bed Only Rate"
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-03-20 14:15:51.772163",
+ "modified": "2026-03-23 09:52:17.940545",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Rate Schedule",
  "owner": "Administrator",
- "permissions": [
-  {
-   "role": "System Manager",
-   "read": 1,
-   "write": 1,
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "report": 1,
-   "share": 1
-  },
-  {
-   "role": "General Manager",
-   "read": 1,
-   "write": 1,
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "report": 1,
-   "share": 1
-  },
-  {
-   "role": "Front Desk Agent",
-   "read": 1,
-   "export": 1,
-   "report": 1
-  },
-  {
-   "role": "Revenue Manager",
-   "read": 1,
-   "write": 1,
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "report": 1,
-   "share": 1
-  }
- ],
+ "permissions": [],
  "row_format": "Dynamic",
  "sort_field": "creation",
  "sort_order": "DESC",
