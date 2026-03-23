@@ -1,0 +1,96 @@
+{
+ "actions": [],
+ "creation": "2026-03-23 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "tax_name",
+  "charge_type",
+  "row_id",
+  "rate",
+  "column_break_1",
+  "tax_account",
+  "from_date",
+  "to_date",
+  "description"
+ ],
+ "fields": [
+  {
+   "fieldname": "tax_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Tax Name",
+   "reqd": 1,
+   "description": "e.g. VAT, NHIL, GETFund Levy, Tourism Levy"
+  },
+  {
+   "fieldname": "charge_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Type",
+   "options": "On Net Total\nOn Previous Row Amount\nOn Previous Row Total\nActual",
+   "default": "On Net Total",
+   "reqd": 1,
+   "description": "On Net Total: % of the room subtotal. On Previous Row Amount: % of a prior row's tax amount. On Previous Row Total: % of the running total after a prior row. Actual: a fixed flat amount."
+  },
+  {
+   "fieldname": "row_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Row #",
+   "depends_on": "eval:['On Previous Row Amount','On Previous Row Total'].includes(doc.charge_type)",
+   "description": "Row number of the tax row to base this calculation on (e.g. 1, 2)"
+  },
+  {
+   "fieldname": "rate",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Rate / Amount",
+   "reqd": 1,
+   "description": "Percentage (e.g. 15 for 15%) when Type is On Net Total or On Previous Row. Flat amount when Type is Actual."
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tax_account",
+   "fieldtype": "Link",
+   "label": "ERPXpand Tax Account",
+   "options": "Account",
+   "description": "Optional: link to an ERPXpand Account of type Tax. Auto-fills Tax Name when selected."
+  },
+  {
+   "fieldname": "from_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "From Date",
+   "description": "Leave blank to apply from the beginning"
+  },
+  {
+   "fieldname": "to_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "To Date",
+   "description": "Leave blank for no end date (ongoing)"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-23 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "iHotel",
+ "name": "Rate Tax Schedule",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
