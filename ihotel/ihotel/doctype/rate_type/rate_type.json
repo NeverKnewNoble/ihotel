@@ -328,7 +328,7 @@
    "fieldtype": "Percent",
    "label": "Total Effective Tax Rate (%)",
    "read_only": 1,
-   "description": "Auto-calculated from all enabled taxes above."
+   "description": "Sum of all currently active Percentage taxes (where today falls within From/To dates)."
   },
   {
    "fieldname": "tax_schedule_section",
@@ -341,18 +341,6 @@
    "label": "Tax Schedule",
    "options": "Rate Tax Schedule",
    "description": "Define taxes with optional effective date ranges. Use 'Load from ERPXpand' to import tax accounts, or add rows manually."
-  },
-  {
-   "fieldname": "effective_tax_section",
-   "fieldtype": "Section Break",
-   "label": "Summary"
-  },
-  {
-   "fieldname": "effective_tax_rate",
-   "fieldtype": "Percent",
-   "label": "Total Effective Tax Rate (%)",
-   "read_only": 1,
-   "description": "Sum of all currently active Percentage taxes (where today falls within From/To dates)."
   }
  ],
  "grid_page_length": 50,
