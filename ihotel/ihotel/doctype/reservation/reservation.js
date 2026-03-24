@@ -3,6 +3,14 @@
 
 frappe.ui.form.on("Reservation", {
 	refresh(frm) {
+		// Pre-populate rate_type cache so tax calculates correctly on load
+		if (!frm.is_new() && frm.doc.rate_type && !frm._rate_cache) {
+			frappe.db.get_doc("Rate Type", frm.doc.rate_type).then((rate) => {
+				frm._rate_cache = rate;
+				frm.trigger("calculate_totals");
+			});
+		}
+
 		// Restrict date pickers to today or later unless allow_past_dates is enabled
 		if (frm.is_new()) {
 			frappe.db.get_single_value("iHotel Settings", "allow_past_dates").then(allow => {
@@ -116,20 +124,35 @@ frappe.ui.form.on("Reservation", {
 			let days = frappe.datetime.get_day_diff(frm.doc.check_out_date, frm.doc.check_in_date);
 			if (days > 0) {
 				frm.set_value("days", days);
-				frm.set_value("total_rent", days * (frm.doc.rent || 0));
 				frm.trigger("calculate_totals");
 			}
 		}
 	},
 
 	calculate_totals(frm) {
-		let total_rent       = frm.doc.total_rent || 0;
-		let tax              = frm.doc.tax        || 0;
-		let discount         = frm.doc.discount   || 0;
-		let other            = frm.doc.other_charges || 0;
-		let rate_lines_total = (frm.doc.rate_lines || []).reduce((s, r) => s + (r.amount || 0), 0);
-		frm.set_value("total_rental",  total_rent + tax);
-		frm.set_value("total_charges", total_rent + tax + other + rate_lines_total - discount);
+		let days             = frm.doc.days || 0;
+		let rent             = frm.doc.rent || 0;
+		let room_subtotal    = flt(rent * days, 2);
+
+		// Additional Rate Charges = sum of rate_lines amounts (after discounts)
+		let additional       = flt((frm.doc.rate_lines || []).reduce((s, r) => s + (r.amount || 0), 0), 2);
+		frm.set_value("total_rent", additional);
+
+		let discount_pct  = frm.doc.discount     || 0;
+		let other         = frm.doc.other_charges || 0;
+		let subtotal      = room_subtotal + additional + other;
+		let discount_amt  = flt(subtotal * discount_pct / 100, 2);
+		let total_charges = flt(subtotal - discount_amt, 2);
+		frm.set_value("total_charges", total_charges);
+
+		// Tax: auto-compute from Rate Type's tax_schedule applied to pre-tax subtotal
+		let tax = frm.doc.tax || 0;
+		if (frm._rate_cache && (frm._rate_cache.tax_schedule || []).length) {
+			tax = compute_tax_from_schedule(frm._rate_cache.tax_schedule, total_charges);
+			frm.set_value("tax", tax);
+		}
+
+		frm.set_value("total_rental", flt(total_charges + tax, 2));
 	},
 
 	color(frm) {
@@ -166,6 +189,7 @@ frappe.ui.form.on("Reservation", {
 			frm.set_intro(indicators.length ? indicators.join(" | ") : "", "blue");
 
 			apply_cached_rate(frm);
+			frm.trigger("calculate_totals");
 		});
 	},
 
@@ -178,8 +202,53 @@ frappe.ui.form.on("Stay Rate Line", {
 	rate_type(frm, cdt, cdn)  { fetch_rate_line(frm, cdt, cdn); },
 	room_type(frm, cdt, cdn)  { fetch_rate_line(frm, cdt, cdn); },
 	rate_column(frm, cdt, cdn){ fetch_rate_line(frm, cdt, cdn); },
+	discount1(frm, cdt, cdn)  { apply_line_discounts(frm, cdt, cdn); },
+	discount2(frm, cdt, cdn)  { apply_line_discounts(frm, cdt, cdn); },
+	discount3(frm, cdt, cdn)  { apply_line_discounts(frm, cdt, cdn); },
 	amount(frm, cdt, cdn)     { frm.trigger("calculate_totals"); },
 });
+
+// Apply cascading discounts to a rate line and update its amount field
+function apply_line_discounts(frm, cdt, cdn) {
+	const row = locals[cdt][cdn];
+	const rate = row.rate || 0;
+	const d1   = row.discount1 || 0;
+	const d2   = row.discount2 || 0;
+	const d3   = row.discount3 || 0;
+	const amount = flt(rate * (1 - d1 / 100) * (1 - d2 / 100) * (1 - d3 / 100), 2);
+	frappe.model.set_value(cdt, cdn, "amount", amount).then(() => {
+		frm.trigger("calculate_totals");
+	});
+}
+
+// Compute total tax from a Rate Type's tax_schedule rows against a net total
+function compute_tax_from_schedule(tax_schedule, net_total) {
+	let total_tax   = 0;
+	let row_amounts = [];
+
+	for (let row of (tax_schedule || [])) {
+		const charge_type = row.charge_type || "On Net Total";
+		const rate        = row.rate || 0;
+		let   amount      = 0;
+
+		if (charge_type === "On Net Total") {
+			amount = net_total * rate / 100;
+		} else if (charge_type === "Actual") {
+			amount = rate;
+		} else if (charge_type === "On Previous Row Amount") {
+			const idx = parseInt(row.row_id || 1) - 1;
+			amount = (row_amounts[idx] || 0) * rate / 100;
+		} else if (charge_type === "On Previous Row Total") {
+			const idx        = parseInt(row.row_id || 1) - 1;
+			const prev_total = net_total + row_amounts.slice(0, idx + 1).reduce((a, b) => a + b, 0);
+			amount = prev_total * rate / 100;
+		}
+
+		row_amounts.push(amount);
+		total_tax += amount;
+	}
+	return flt(total_tax, 2);
+}
 
 // Maps the Rate Column label to its field name in Rate Schedule
 const RATE_COLUMN_MAP = {
@@ -227,8 +296,10 @@ function fetch_rate_line(frm, cdt, cdn) {
 		}
 
 		frappe.model.set_value(cdt, cdn, "description", desc);
-		frappe.model.set_value(cdt, cdn, "rate", resolved);
-		frappe.model.set_value(cdt, cdn, "amount", resolved);
+		frappe.model.set_value(cdt, cdn, "rate", resolved).then(() => {
+			// Apply any existing discounts on top of the resolved rate
+			apply_line_discounts(frm, cdt, cdn);
+		});
 	});
 }
 

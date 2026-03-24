@@ -50,14 +50,61 @@ class Reservation(Document):
 			self.days = date_diff(self.check_out_date, self.check_in_date)
 
 	def calculate_totals(self):
-		if self.rent and self.days:
-			self.total_rent = (self.rent or 0) * self.days
-		tax = self.tax or 0
-		discount = self.discount or 0
-		other = self.other_charges or 0
-		total_rent = self.total_rent or 0
-		self.total_rental = total_rent + tax
-		self.total_charges = total_rent + tax + other - discount
+		room_subtotal = round((self.rent or 0) * (self.days or 0), 2)
+
+		# Additional Rate Charges = sum of discounted rate_lines amounts
+		additional = round(sum((row.amount or 0) for row in (self.rate_lines or [])), 2)
+		self.total_rent = additional
+
+		from frappe.utils import flt
+		discount_pct = flt(self.discount)
+		other        = flt(self.other_charges)
+
+		subtotal           = room_subtotal + additional + other
+		discount_amt       = round(subtotal * discount_pct / 100, 2)
+		self.total_charges = round(subtotal - discount_amt, 2)
+
+		# Tax: auto-compute from Rate Type's tax_schedule applied to pre-tax subtotal
+		if self.rate_type:
+			self.tax = self._compute_tax_from_schedule(self.total_charges)
+
+		self.total_rental = round(self.total_charges + (self.tax or 0), 2)
+
+	def _compute_tax_from_schedule(self, net_total):
+		try:
+			rt = frappe.get_cached_doc("Rate Type", self.rate_type)
+		except Exception:
+			return self.tax or 0
+
+		tax_schedule = rt.get("tax_schedule") or []
+		if not tax_schedule:
+			return self.tax or 0
+
+		total_tax   = 0.0
+		row_amounts = []
+
+		for row in tax_schedule:
+			charge_type = row.charge_type or "On Net Total"
+			rate        = row.rate or 0
+
+			if charge_type == "On Net Total":
+				amount = net_total * rate / 100
+			elif charge_type == "Actual":
+				amount = rate
+			elif charge_type == "On Previous Row Amount":
+				idx    = int(row.row_id or 1) - 1
+				amount = (row_amounts[idx] if 0 <= idx < len(row_amounts) else 0) * rate / 100
+			elif charge_type == "On Previous Row Total":
+				idx        = int(row.row_id or 1) - 1
+				prev_total = net_total + sum(row_amounts[: idx + 1])
+				amount     = prev_total * rate / 100
+			else:
+				amount = 0
+
+			row_amounts.append(amount)
+			total_tax += amount
+
+		return round(total_tax, 2)
 
 	def validate_room_availability(self):
 		if not self.room or self.status == "cancelled":
@@ -227,6 +274,8 @@ def convert_to_hotel_stay(reservation_name):
 		"rate_type": reservation.rate_type,
 		"business_source": reservation.business_source_category,
 		"status": "Reserved",
+		"deposit_amount": reservation.deposit or 0,
+		"deposit_received": reservation.deposit_received or 0,
 	})
 	hotel_stay.insert(ignore_permissions=True)
 

@@ -52,10 +52,8 @@
   "floor",
   "building",
   "column_break_bxqg",
-  "adults",
   "market_segment",
   "column_break_rxah",
-  "children",
   "business_source_category",
   "requests_section",
   "special_requests",
@@ -64,20 +62,29 @@
   "eta",
   "no_post",
   "rate_details_tab",
+  "adults",
+  "column_break_ytyy",
+  "children",
   "rate_details_section",
   "rate_type",
+  "column_break_rptq",
   "rate_room_type",
   "section_break_hxvt",
   "rent",
-  "discount",
   "other_charges",
   "column_break_lvby",
   "tax",
-  "total_rent",
-  "total_rental",
+  "discount",
+  "column_break_zatg",
+  "deposit_received",
   "deposit",
-  "total_charges",
   "cancellation_fee",
+  "section_break_totals",
+  "total_rent",
+  "column_break_saln",
+  "total_charges",
+  "column_break_zbxj",
+  "total_rental",
   "section_break_rate_lines",
   "rate_lines",
   "guarantee_and_payment_tab",
@@ -103,13 +110,14 @@
   "section_break_ndhg",
   "customer_id",
   "amount",
-  "confirmation_email_sent"
+  "confirmation_email_sent",
+  "amended_from"
  ],
  "fields": [
   {
    "fieldname": "stay_and_rent_details_tab",
    "fieldtype": "Tab Break",
-   "label": "Stay & Rate Details"
+   "label": "Stay Details"
   },
   {
    "fieldname": "check_in_date",
@@ -227,58 +235,78 @@
    "options": "Rate Type"
   },
   {
+   "description": "Room type used to look up the rate from the Rate Schedule. Defaults to the booked room type.",
    "fieldname": "rate_room_type",
    "fieldtype": "Link",
    "label": "Room Type (Rate)",
-   "options": "Room Type",
-   "description": "Room type used to look up the rate from the Rate Schedule. Defaults to the booked room type."
+   "options": "Room Type"
   },
   {
    "fieldname": "section_break_hxvt",
    "fieldtype": "Section Break"
   },
   {
+   "default": "0.00",
    "fieldname": "rent",
    "fieldtype": "Currency",
    "label": "Rate / Night"
-  },
-  {
-   "fieldname": "discount",
-   "fieldtype": "Currency",
-   "label": "Discount"
-  },
-  {
-   "fieldname": "other_charges",
-   "fieldtype": "Currency",
-   "label": "Other Charges"
   },
   {
    "fieldname": "column_break_lvby",
    "fieldtype": "Column Break"
   },
   {
+   "default": "0.00",
    "fieldname": "tax",
    "fieldtype": "Currency",
    "label": "Tax"
   },
   {
+   "default": "0.00",
    "fieldname": "total_rent",
    "fieldtype": "Currency",
-   "label": "Total Rent",
+   "label": "Additional Rate Charges",
    "read_only": 1
   },
   {
+   "default": "0.00",
    "fieldname": "total_rental",
    "fieldtype": "Currency",
    "label": "Total (incl. Tax)",
    "read_only": 1
   },
   {
+   "default": "0.00",
+   "depends_on": "eval:doc.deposit_received == 1",
    "fieldname": "deposit",
    "fieldtype": "Currency",
-   "label": "Deposit"
+   "label": "Deposit",
+   "mask": 1
   },
   {
+   "default": "0",
+   "fieldname": "deposit_received",
+   "fieldtype": "Check",
+   "label": "Deposit Received"
+  },
+  {
+   "default": "0.00",
+   "fieldname": "other_charges",
+   "fieldtype": "Currency",
+   "label": "Other Charges"
+  },
+  {
+   "default": "0",
+   "fieldname": "discount",
+   "fieldtype": "Percent",
+   "label": "Discount %"
+  },
+  {
+   "fieldname": "section_break_totals",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "0.00",
    "fieldname": "total_charges",
    "fieldtype": "Currency",
    "label": "Total Charges",
@@ -297,11 +325,11 @@
    "label": "Additional Rates"
   },
   {
+   "description": "Add extra rate types from Rate Schedule (e.g. packages, supplements)",
    "fieldname": "rate_lines",
    "fieldtype": "Table",
    "label": "Additional Rates",
-   "options": "Stay Rate Line",
-   "description": "Add extra rate types from Rate Schedule (e.g. packages, supplements)"
+   "options": "Stay Rate Line"
   },
   {
    "fieldname": "guarantee_section",
@@ -644,63 +672,94 @@
    "fieldtype": "Check",
    "hidden": 1,
    "label": "Confirmation Email Sent"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Reservation",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_rptq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_ytyy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_zbxj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_zatg",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_saln",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
+ "is_submittable": 1,
  "links": [],
- "modified": "2026-03-20 10:37:12.684164",
+ "modified": "2026-03-24 07:43:26.204994",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Reservation",
  "owner": "Administrator",
  "permissions": [
   {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
    "role": "System Manager",
-   "read": 1,
-   "write": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
+   "read": 1,
    "report": 1,
-   "share": 1
-  },
-  {
    "role": "General Manager",
-   "read": 1,
-   "write": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
    "create": 1,
-   "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
+   "read": 1,
    "report": 1,
-   "share": 1,
-   "submit": 1,
-   "cancel": 1,
-   "amend": 1
-  },
-  {
    "role": "Front Desk Agent",
-   "read": 1,
-   "write": 1,
-   "create": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "report": 1,
    "share": 1,
    "submit": 1,
-   "cancel": 1,
-   "amend": 1
+   "write": 1
   },
   {
-   "role": "Revenue Manager",
-   "read": 1,
    "export": 1,
-   "report": 1
+   "read": 1,
+   "report": 1,
+   "role": "Revenue Manager"
   }
  ],
  "row_format": "Dynamic",
