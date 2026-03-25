@@ -28,6 +28,15 @@ class iHotelProfile(Document):
 		if self.status == "Open" and self.outstanding_balance <= 0 and self.total_amount > 0:
 			self.status = "Settled"
 
+	def before_trash(self):
+		"""Break the back-reference in Checked In before Frappe's link-check runs."""
+		if self.hotel_stay:
+			try:
+				frappe.db.set_value("Checked In", self.hotel_stay, "profile", None,
+				                    update_modified=False)
+			except Exception:
+				pass
+
 	def post_charge(self, charge_type, description, rate, quantity=1,
 	                reference_doctype=None, reference_name=None):
 		"""Append a charge line to this folio and save."""

@@ -386,6 +386,22 @@ class CheckedIn(Document):
                 if not service.service_type:
                     frappe.throw(_("Row {0} in Additional Services table is empty. Please fill in the Service Type or remove the row.").format(idx))
 
+    def before_cancel(self):
+        """Break the Profile back-link before Frappe's cancel link-check runs."""
+        if self.profile:
+            frappe.db.set_value("iHotel Profile", self.profile, "hotel_stay", None,
+                                update_modified=False)
+
+    def before_trash(self):
+        """Delete the linked Profile before Frappe's trash link-check runs."""
+        if self.profile:
+            try:
+                frappe.delete_doc("iHotel Profile", self.profile,
+                                  ignore_permissions=True, force=True)
+            except Exception:
+                pass
+            self.profile = None
+
     def on_submit(self):
         """
         Update room status when hotel stay is submitted.
