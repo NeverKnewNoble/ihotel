@@ -210,7 +210,6 @@ class CheckedIn(Document):
         self.validate_dates()
         self.validate_status_transition()
         self.validate_room_availability()
-        self.validate_rate_type()
         self.calculate_additional_services_amount()
         self.calculate_total_amount()
         self.validate_additional_services()
@@ -318,92 +317,53 @@ class CheckedIn(Document):
                              "There is an overlapping reservation: {0}").format(
                              overlapping_stays[0].name))
 
-    def validate_rate_type(self):
-        if self.rate_type and self.nights:
-            rate_type = frappe.get_cached_doc("Rate Type", self.rate_type)
-            if rate_type.minimum_stay_nights and self.nights < rate_type.minimum_stay_nights:
-                frappe.throw(
-                    _("Minimum stay for rate type {0} is {1} nights").format(
-                        self.rate_type, rate_type.minimum_stay_nights
-                    )
-                )
-            if rate_type.maximum_stay_nights and self.nights > rate_type.maximum_stay_nights:
-                frappe.throw(
-                    _("Maximum stay for rate type {0} is {1} nights").format(
-                        self.rate_type, rate_type.maximum_stay_nights
-                    )
-                )
-
     def calculate_total_amount(self):
-        """
-        Calculate totals: room subtotal + additional rate charges + services + other - discount%, then + tax.
-        """
         from frappe.utils import flt
         if self.expected_check_in and self.expected_check_out:
             checked_in_dt = get_datetime(self.expected_check_in)
             check_out_dt  = get_datetime(self.expected_check_out)
             nights = (check_out_dt - checked_in_dt).days
-            if nights > 0:
-                self.nights = nights
-            else:
-                self.nights = 0
+            self.nights = max(nights, 0)
 
-        nights        = self.nights or 0
-        room_subtotal = round(flt(self.room_rate) * nights, 2)
+        nights           = self.nights or 0
+        rate_lines_total = round(sum(flt(r.amount) for r in (self.rate_lines or [])), 2)
+        svc_total        = flt(self.additional_services_total)
 
-        # Additional Rate Charges = sum of rate_lines amounts (after row-level discounts)
-        self.total_rent = round(sum(flt(r.amount) for r in (self.rate_lines or [])), 2)
+        self.total_charges = round(rate_lines_total + svc_total, 2)
+        self.tax           = self._compute_tax(self.total_charges)
+        self.total_amount  = round(self.total_charges + self.tax, 2)
+        # Keep room_rate in sync as nightly rate (used by extend_stay)
+        self.room_rate = round(self.total_charges / (nights or 1), 2)
 
-        discount_pct = flt(self.discount)
-        other        = flt(self.other_charges)
-        svc_total    = flt(self.additional_services_total)
-
-        subtotal           = room_subtotal + self.total_rent + svc_total + other
-        discount_amt       = round(subtotal * discount_pct / 100, 2)
-        self.total_charges = round(subtotal - discount_amt, 2)
-
-        # Tax: auto-compute from Rate Type's tax_schedule applied to pre-tax subtotal
-        if self.rate_type:
-            self.tax = self._compute_tax_from_schedule(self.total_charges)
-
-        self.total_amount = round(self.total_charges + flt(self.tax), 2)
-
-    def _compute_tax_from_schedule(self, net_total):
+    def _compute_tax(self, net_total):
+        """Compute tax from the first rate_line's Rate Type tax_schedule."""
+        from frappe.utils import flt, cint
+        rate_type_name = next(
+            (r.rate_type for r in (self.rate_lines or []) if r.rate_type), None
+        )
+        if not rate_type_name:
+            return 0.0
         try:
-            rt = frappe.get_cached_doc("Rate Type", self.rate_type)
+            rt = frappe.get_cached_doc("Rate Type", rate_type_name)
         except Exception:
-            return flt(self.tax)
-
-        tax_schedule = rt.get("tax_schedule") or []
-        if not tax_schedule:
-            return flt(self.tax)
-
-        from frappe.utils import flt as _flt
-        total_tax   = 0.0
-        row_amounts = []
-
-        for row in tax_schedule:
-            charge_type = row.charge_type or "On Net Total"
-            rate        = row.rate or 0
-
-            if charge_type == "On Net Total":
-                amount = net_total * rate / 100
-            elif charge_type == "Actual":
-                amount = rate
-            elif charge_type == "On Previous Row Amount":
-                idx    = int(row.row_id or 1) - 1
-                amount = (row_amounts[idx] if 0 <= idx < len(row_amounts) else 0) * rate / 100
-            elif charge_type == "On Previous Row Total":
-                idx        = int(row.row_id or 1) - 1
-                prev_total = net_total + sum(row_amounts[: idx + 1])
-                amount     = prev_total * rate / 100
-            else:
-                amount = 0
-
-            row_amounts.append(amount)
-            total_tax += amount
-
-        return round(total_tax, 2)
+            return 0.0
+        amounts = []
+        for row in (rt.tax_schedule or []):
+            ct   = row.charge_type or "On Net Total"
+            rate = flt(row.rate)
+            amt  = 0.0
+            if ct == "On Net Total":
+                amt = net_total * rate / 100
+            elif ct == "Actual":
+                amt = rate
+            elif ct == "On Previous Row Amount":
+                idx = cint(row.row_id or 1) - 1
+                amt = (amounts[idx] if idx < len(amounts) else 0) * rate / 100
+            elif ct == "On Previous Row Total":
+                idx = cint(row.row_id or 1) - 1
+                amt = (net_total + sum(amounts[:idx + 1])) * rate / 100
+            amounts.append(round(amt, 2))
+        return round(sum(amounts), 2)
 
     def calculate_additional_services_amount(self):
         """
@@ -452,31 +412,18 @@ class CheckedIn(Document):
 
         from frappe.utils import flt, nowdate
 
-        # Post the room charge for the full stay upfront
-        if self.room_rate and self.nights:
-            room_rate    = flt(self.room_rate)
-            discount_pct = flt(self.discount)
+        # Post each rate line as a folio charge
+        for rl in (self.rate_lines or []):
+            if not flt(rl.amount):
+                continue
             profile.post_charge(
                 charge_type="Room Charge",
-                description=_("Room {0} — {1} night(s) @ {2}").format(
-                    self.room or "", self.nights, room_rate
-                ),
-                rate=room_rate,
-                quantity=self.nights,
+                description=rl.description or _("Rate Charge"),
+                rate=flt(rl.amount),
+                quantity=1,
                 reference_doctype="Checked In",
                 reference_name=self.name,
             )
-            if discount_pct > 0:
-                room_subtotal = room_rate * self.nights
-                discount_amt  = round(room_subtotal * discount_pct / 100, 2)
-                profile.post_charge(
-                    charge_type="Other",
-                    description=_("Discount {0}% applied").format(discount_pct),
-                    rate=-discount_amt,
-                    quantity=1,
-                    reference_doctype="Checked In",
-                    reference_name=self.name,
-                )
 
         # Post each additional service as a folio charge
         for svc in (self.additional_services or []):
