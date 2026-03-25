@@ -12,15 +12,17 @@ class iHotelSettings(Document):
 
 	def on_update(self):
 		if self.currency:
-			# Update every currency default row (global + user-specific) so no
-			# user-level GHS entry can silently override the global USD setting
+			# Update all existing currency defaults (global + any user-specific ones)
 			frappe.db.sql(
 				"UPDATE `tabDefaultValue` SET defvalue=%s WHERE defkey='currency'",
 				self.currency
 			)
-			# Insert global row if none existed yet
+			# Insert the global row if none existed yet
 			if not frappe.db.exists("DefaultValue", {"defkey": "currency", "parent": "__default"}):
 				frappe.db.set_default("currency", self.currency)
+			# Commit BEFORE clearing cache — prevents race condition where cache
+			# repopulates from the DB before our UPDATE is visible to other connections
+			frappe.db.commit()
 			frappe.clear_cache()
 
 	def validate_accounting(self):
