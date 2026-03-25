@@ -28,7 +28,7 @@ class iHotelProfile(Document):
 		if self.status == "Open" and self.outstanding_balance <= 0 and self.total_amount > 0:
 			self.status = "Settled"
 
-	def before_trash(self):
+	def on_trash(self):
 		"""Break the back-reference in Checked In before Frappe's link-check runs."""
 		if self.hotel_stay:
 			try:
