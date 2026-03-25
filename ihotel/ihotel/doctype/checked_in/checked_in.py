@@ -392,7 +392,7 @@ class CheckedIn(Document):
             frappe.db.set_value("iHotel Profile", self.profile, "hotel_stay", None,
                                 update_modified=False)
 
-    def before_trash(self):
+    def on_trash(self):
         """Delete the linked Profile before Frappe's trash link-check runs."""
         if self.profile:
             try:
@@ -400,7 +400,6 @@ class CheckedIn(Document):
                                   ignore_permissions=True, force=True)
             except Exception:
                 pass
-            self.profile = None
 
     def on_submit(self):
         """
