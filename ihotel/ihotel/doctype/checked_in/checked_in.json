@@ -40,32 +40,23 @@
   "adults",
   "column_break_pax2",
   "children",
-  "section_break_fhmg",
-  "rate_type",
-  "column_break_hace",
-  "rate_room_type",
   "section_break_pfza",
-  "room_rate",
-  "other_charges",
-  "column_break_nggu",
-  "tax",
-  "discount",
-  "column_break_nmpk",
-  "deposit_amount",
+  "rate_lines",
   "section_break_ci_totals",
-  "total_rent",
-  "column_break_ci_saln",
   "total_charges",
+  "column_break_ci_saln",
+  "tax",
   "column_break_ci_zbxj",
   "total_amount",
-  "section_break_jnsv",
-  "rate_lines",
+  "section_break_xjeh",
+  "deposit_amount",
   "folio_tab",
   "profile",
   "sales_invoice",
   "column_break_surq",
   "payment_status",
-  "amended_from"
+  "amended_from",
+  "room_rate"
  ],
  "fields": [
   {
@@ -141,19 +132,6 @@
    "in_standard_filter": 1,
    "label": "Status",
    "options": "Reserved\nChecked In\nChecked Out\nNo Show\nCancelled"
-  },
-  {
-   "fieldname": "rate_type",
-   "fieldtype": "Link",
-   "label": "Rate Type",
-   "options": "Rate Type"
-  },
-  {
-   "description": "Room type used to look up the rate from the Rate Schedule. Defaults to the booked room type.",
-   "fieldname": "rate_room_type",
-   "fieldtype": "Link",
-   "label": "Room Type (Rate)",
-   "options": "Room Type"
   },
   {
    "fieldname": "business_source",
@@ -313,61 +291,26 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "section_break_fhmg",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "column_break_hace",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "column_break_nggu",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "section_break_pfza",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Rates"
   },
   {
    "fieldname": "room_rate",
    "fieldtype": "Currency",
+   "hidden": 1,
    "label": "Rate / Night"
   },
   {
    "default": "0.00",
-   "fieldname": "other_charges",
-   "fieldtype": "Currency",
-   "label": "Other Charges"
-  },
-  {
-   "fieldname": "column_break_nmpk",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "tax",
    "fieldtype": "Currency",
-   "label": "Tax"
-  },
-  {
-   "default": "0",
-   "fieldname": "discount",
-   "fieldtype": "Percent",
-   "label": "Discount %"
+   "label": "Tax",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_ci_totals",
    "fieldtype": "Section Break"
-  },
-  {
-   "default": "0.00",
-   "fieldname": "total_rent",
-   "fieldtype": "Currency",
-   "label": "Additional Rate Charges",
-   "read_only": 1
-  },
-  {
-   "fieldname": "column_break_ci_saln",
-   "fieldtype": "Column Break"
   },
   {
    "default": "0.00",
@@ -377,12 +320,12 @@
    "read_only": 1
   },
   {
-   "fieldname": "column_break_ci_zbxj",
+   "fieldname": "column_break_ci_saln",
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "section_break_jnsv",
-   "fieldtype": "Section Break"
+   "fieldname": "column_break_ci_zbxj",
+   "fieldtype": "Column Break"
   },
   {
    "allow_on_submit": 1,
@@ -394,23 +337,27 @@
    "read_only": 1
   },
   {
-   "description": "Add extra rate types from Rate Schedule (e.g. packages, supplements)",
+   "description": "Add rate rows from Rate Schedule \u2014 each row auto-populates its rate when a Rate Type is selected.",
    "fieldname": "rate_lines",
    "fieldtype": "Table",
-   "label": "Additional Rates",
+   "label": "Rates",
    "options": "Stay Rate Line"
   },
   {
    "fieldname": "rate_tab",
    "fieldtype": "Tab Break",
    "label": "Rate"
+  },
+  {
+   "fieldname": "section_break_xjeh",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-24 07:38:34.354202",
+ "modified": "2026-03-25 08:17:43.820632",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Checked In",
