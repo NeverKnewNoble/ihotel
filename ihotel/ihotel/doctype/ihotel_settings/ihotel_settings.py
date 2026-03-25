@@ -10,6 +10,11 @@ class iHotelSettings(Document):
 	def validate(self):
 		self.validate_accounting()
 
+	def on_update(self):
+		if self.currency:
+			frappe.db.set_default("currency", self.currency)
+			frappe.clear_cache()
+
 	def validate_accounting(self):
 		"""If accounting integration is on, require Company + both items."""
 		if not self.get("enable_accounting_integration"):
