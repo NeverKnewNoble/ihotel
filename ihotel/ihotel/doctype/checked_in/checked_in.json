@@ -23,11 +23,6 @@
   "nights",
   "column_break_vvzc",
   "business_source",
-  "deposit_section",
-  "deposit_received",
-  "column_break_dep2",
-  "deposit_method",
-  "deposit_reference",
   "guest_services_section",
   "do_not_disturb",
   "make_up_room",
@@ -178,39 +173,10 @@
    "label": "Children"
   },
   {
-   "fieldname": "deposit_section",
-   "fieldtype": "Section Break",
-   "label": "Deposit / Pre-Authorization"
-  },
-  {
    "allow_on_submit": 1,
    "fieldname": "deposit_amount",
    "fieldtype": "Currency",
    "label": "Deposit"
-  },
-  {
-   "allow_on_submit": 1,
-   "default": "0",
-   "fieldname": "deposit_received",
-   "fieldtype": "Check",
-   "label": "Deposit Received"
-  },
-  {
-   "fieldname": "column_break_dep2",
-   "fieldtype": "Column Break"
-  },
-  {
-   "allow_on_submit": 1,
-   "fieldname": "deposit_method",
-   "fieldtype": "Select",
-   "label": "Deposit Method",
-   "options": "\nCash\nVisa\nMastercard\nAmex\nBank Transfer\nCity Ledger"
-  },
-  {
-   "allow_on_submit": 1,
-   "fieldname": "deposit_reference",
-   "fieldtype": "Data",
-   "label": "Deposit Reference / Auth Code"
   },
   {
    "fieldname": "guest_services_section",
@@ -357,7 +323,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-25 08:17:43.820632",
+ "modified": "2026-03-25 10:02:04.910836",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Checked In",
