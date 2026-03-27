@@ -46,7 +46,7 @@ def get_turndown_data():
 	stays = frappe.get_all(
 		"Checked In",
 		filters={"status": ["in", ["Reserved", "Checked In"]], "docstatus": 1},
-		fields=["name", "guest", "room", "turndown_requested", "turndown_reason"],
+		fields=["name", "guest", "room", "turndown_requested"],
 		order_by="room asc",
 	)
 	for stay in stays:
@@ -64,7 +64,7 @@ def get_turndown_data():
 			"floor": room.floor if room else "",
 			"room_type": room.room_type if room else "",
 			"turndown_requested": int(stay.turndown_requested or 0),
-			"turndown_reason": stay.turndown_reason or "",
+			"turndown_reason": "",
 		})
 
 	# ── Completed turndown tasks for today ───────────────────────────────────
