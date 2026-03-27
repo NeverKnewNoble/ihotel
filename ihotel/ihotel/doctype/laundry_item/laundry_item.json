@@ -1,0 +1,153 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:item_name",
+ "creation": "2026-03-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "item_name",
+  "item_group",
+  "is_active",
+  "column_break_lnd1",
+  "guest_price",
+  "outsider_price",
+  "section_break_lnd2",
+  "fabric_type",
+  "column_break_lnd3",
+  "image",
+  "section_break_lnd4",
+  "special_instructions"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Item Code",
+   "unique": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Item Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_group",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item Group",
+   "options": "Item Group"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Active"
+  },
+  {
+   "fieldname": "column_break_lnd1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "guest_price",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Guest Price"
+  },
+  {
+   "fieldname": "outsider_price",
+   "fieldtype": "Currency",
+   "label": "Outsider Price"
+  },
+  {
+   "fieldname": "section_break_lnd2",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "fabric_type",
+   "fieldtype": "Select",
+   "label": "Fabric Type",
+   "options": "\nCotton\nSilk\nWool\nSynthetic\nBlend\nDelicate\nOther"
+  },
+  {
+   "fieldname": "column_break_lnd3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach",
+   "label": "Image"
+  },
+  {
+   "fieldname": "section_break_lnd4",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "special_instructions",
+   "fieldtype": "Small Text",
+   "label": "Special Instructions"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-27 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "iHotel",
+ "name": "Laundry Item",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "General Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Laundry Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Laundry Supervisor"
+  },
+  {
+   "read": 1,
+   "role": "Laundry Staff"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

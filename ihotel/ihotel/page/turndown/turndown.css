@@ -52,3 +52,17 @@
 	color: #3b82f6; font-size: 12px; text-decoration: none; margin-left: 6px;
 }
 .td-link:hover { text-decoration: underline; }
+
+.td-source-badge {
+	display: inline-block; padding: 2px 8px;
+	border-radius: 10px; font-size: 11px; font-weight: 600;
+}
+.td-source-badge.reservation  { background: #ede9fe; color: #6d28d9; }
+.td-source-badge.checked-in   { background: #d1fae5; color: #065f46; }
+
+.td-toggle-btn { margin-right: 4px; }
+
+.td-reason {
+	font-size: 11px; color: var(--text-muted);
+	margin-top: 3px; font-style: italic;
+}

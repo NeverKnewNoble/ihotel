@@ -1,0 +1,300 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-03-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "customer_type",
+  "customer",
+  "contact_person",
+  "column_break_lo1",
+  "reservation_id",
+  "room_number",
+  "contact_mobile",
+  "section_break_lo2",
+  "order_date",
+  "expected_delivery",
+  "service_type",
+  "column_break_lo3",
+  "processing_mode",
+  "laundry_supplier",
+  "status",
+  "section_break_lo_items",
+  "items",
+  "section_break_lo_totals",
+  "total_amount",
+  "column_break_lo_paid",
+  "paid_amount",
+  "column_break_lo_out",
+  "outstanding_amount",
+  "section_break_lo_folio",
+  "post_to_folio",
+  "ihotel_profile",
+  "sales_invoice",
+  "column_break_lo_notes",
+  "notes"
+ ],
+ "fields": [
+  {
+   "default": "LAU-.YYYY.-",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "LAU-.YYYY.-"
+  },
+  {
+   "default": "Guest",
+   "fieldname": "customer_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Customer Type",
+   "options": "Guest\nOutsider",
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "contact_person",
+   "fieldtype": "Data",
+   "label": "Contact Person"
+  },
+  {
+   "fieldname": "column_break_lo1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reservation_id",
+   "fieldtype": "Data",
+   "label": "Reservation ID"
+  },
+  {
+   "fieldname": "room_number",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Room Number"
+  },
+  {
+   "fieldname": "contact_mobile",
+   "fieldtype": "Data",
+   "label": "Contact Mobile"
+  },
+  {
+   "fieldname": "section_break_lo2",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "order_date",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Order Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "expected_delivery",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Expected Delivery"
+  },
+  {
+   "fieldname": "service_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Service Type",
+   "options": "Laundry Service Type"
+  },
+  {
+   "fieldname": "column_break_lo3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Internal",
+   "fieldname": "processing_mode",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Processing Mode",
+   "options": "Internal\nOutsourced"
+  },
+  {
+   "depends_on": "eval:doc.processing_mode == 'Outsourced'",
+   "fieldname": "laundry_supplier",
+   "fieldtype": "Link",
+   "label": "Laundry Supplier",
+   "options": "Laundry Supplier"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nCollected\nProcessing\nQuality Check\nReady\nDelivered\nCancelled"
+  },
+  {
+   "fieldname": "section_break_lo_items",
+   "fieldtype": "Section Break",
+   "label": "Items"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Laundry Order Item"
+  },
+  {
+   "fieldname": "section_break_lo_totals",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "0.00",
+   "fieldname": "total_amount",
+   "fieldtype": "Currency",
+   "label": "Total Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_lo_paid",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0.00",
+   "fieldname": "paid_amount",
+   "fieldtype": "Currency",
+   "label": "Paid Amount"
+  },
+  {
+   "fieldname": "column_break_lo_out",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0.00",
+   "fieldname": "outstanding_amount",
+   "fieldtype": "Currency",
+   "label": "Outstanding",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_lo_folio",
+   "fieldtype": "Section Break",
+   "label": "Billing"
+  },
+  {
+   "default": "0",
+   "fieldname": "post_to_folio",
+   "fieldtype": "Check",
+   "label": "Post to Guest Folio"
+  },
+  {
+   "depends_on": "eval:doc.post_to_folio == 1",
+   "fieldname": "ihotel_profile",
+   "fieldtype": "Link",
+   "label": "iHotel Profile",
+   "options": "iHotel Profile"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "options": "Sales Invoice",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_lo_notes",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-03-27 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "iHotel",
+ "name": "Laundry Order",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "General Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Laundry Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Laundry Supervisor",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Laundry Staff"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Front Desk Agent"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

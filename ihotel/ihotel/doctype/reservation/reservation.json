@@ -37,6 +37,7 @@
   "column_break_status",
   "color",
   "cancellation_number",
+  "proforma_invoice",
   "section_break_amte",
   "check_in_date",
   "check_in_time",
@@ -60,6 +61,8 @@
   "comments",
   "column_break_requests",
   "eta",
+  "turndown_requested",
+  "turndown_reason",
   "no_post",
   "rate_details_tab",
   "adults",
@@ -203,9 +206,9 @@
   },
   {
    "fieldname": "market_segment",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "label": "Market Segment",
-   "options": "\nCorporate\nLeisure\nGroup\nOTA\nWalk-In\nGovernment\nOther"
+   "options": "Hotel Market Segment"
   },
   {
    "fieldname": "business_source_category",
@@ -336,6 +339,18 @@
   },
   {
    "default": "0",
+   "fieldname": "turndown_requested",
+   "fieldtype": "Check",
+   "label": "Turndown Requested"
+  },
+  {
+   "depends_on": "eval:doc.turndown_requested == 1",
+   "fieldname": "turndown_reason",
+   "fieldtype": "Small Text",
+   "label": "Turndown Reason / Notes"
+  },
+  {
+   "default": "0",
    "fieldname": "no_post",
    "fieldtype": "Check",
    "label": "No Post (block room charges)"
@@ -380,6 +395,13 @@
    "fieldname": "cancellation_number",
    "fieldtype": "Data",
    "label": "Cancellation Number",
+   "read_only": 1
+  },
+  {
+   "fieldname": "proforma_invoice",
+   "fieldtype": "Link",
+   "label": "Proforma Invoice",
+   "options": "Sales Invoice",
    "read_only": 1
   },
   {
@@ -642,7 +664,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-25 08:32:26.818711",
+ "modified": "2026-03-25 16:24:12.682457",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Reservation",
@@ -694,5 +716,18 @@
  "rows_threshold_for_grid_search": 20,
  "sort_field": "creation",
  "sort_order": "DESC",
- "states": []
+ "states": [
+ {
+  "color": "Orange",
+  "title": "pending"
+ },
+ {
+  "color": "Green",
+  "title": "confirmed"
+ },
+ {
+  "color": "Red",
+  "title": "cancelled"
+ }
+]
 }

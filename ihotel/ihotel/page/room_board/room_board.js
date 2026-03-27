@@ -330,9 +330,16 @@ class RoomBoard {
 	}
 
 	show_check_in_dialog(room) {
+		const rack_rate = room.rack_rate || 0;
+
 		const d = new frappe.ui.Dialog({
 			title: `Check In — Room ${frappe.utils.escape_html(room.room_number || room.name)}`,
 			fields: [
+				// ── Guest & Room ──────────────────────────────────────────
+				{
+					fieldtype: "Section Break",
+					label: "Guest & Room",
+				},
 				{
 					fieldtype: "Link",
 					fieldname: "guest",
@@ -345,37 +352,116 @@ class RoomBoard {
 					fieldtype: "Data",
 					fieldname: "room_display",
 					label: "Room",
-					default: room.room_number || room.name,
+					default: `${room.room_number || room.name}  (${room.room_type || ""}, Floor ${room.floor || "—"})`,
 					read_only: 1,
 				},
-				{ fieldtype: "Section Break" },
+
+				// ── Stay Dates ────────────────────────────────────────────
+				{
+					fieldtype: "Section Break",
+					label: "Stay Dates",
+				},
 				{
 					fieldtype: "Datetime",
 					fieldname: "expected_check_in",
-					label: "Expected Check In",
+					label: "Check In",
 					reqd: 1,
 					default: frappe.datetime.now_datetime(),
+					onchange: function () {
+						recalc_nights(d);
+						resolve_rate(d, room);
+					},
 				},
 				{ fieldtype: "Column Break" },
 				{
 					fieldtype: "Datetime",
 					fieldname: "expected_check_out",
-					label: "Expected Check Out",
+					label: "Check Out",
 					reqd: 1,
+					onchange: function () {
+						recalc_nights(d);
+						resolve_rate(d, room);
+					},
 				},
-				{ fieldtype: "Section Break" },
+				{ fieldtype: "Column Break" },
+				{
+					fieldtype: "Int",
+					fieldname: "nights",
+					label: "Nights",
+					read_only: 1,
+					default: 0,
+				},
+
+				// ── Occupants ─────────────────────────────────────────────
+				{
+					fieldtype: "Section Break",
+					label: "Occupants",
+				},
+				{
+					fieldtype: "Int",
+					fieldname: "adults",
+					label: "Adults",
+					default: 1,
+					reqd: 1,
+					onchange: function () {
+						resolve_rate(d, room);
+					},
+				},
+				{ fieldtype: "Column Break" },
+				{
+					fieldtype: "Int",
+					fieldname: "children",
+					label: "Children",
+					default: 0,
+				},
+
+				// ── Rate ──────────────────────────────────────────────────
+				{
+					fieldtype: "Section Break",
+					label: "Rate",
+				},
 				{
 					fieldtype: "Link",
 					fieldname: "rate_type",
 					label: "Rate Type",
 					options: "Rate Type",
+					onchange: function () {
+						resolve_rate(d, room);
+					},
 				},
 				{ fieldtype: "Column Break" },
 				{
 					fieldtype: "Currency",
 					fieldname: "room_rate",
-					label: "Room Rate",
+					label: "Room Rate / Night",
 					reqd: 1,
+					default: rack_rate || 0,
+					description: rack_rate
+						? `Rack rate: ${format_currency(rack_rate)}`
+						: "",
+				},
+				{
+					fieldtype: "HTML",
+					fieldname: "rate_info",
+					options: "",
+				},
+
+				// ── Other ─────────────────────────────────────────────────
+				{
+					fieldtype: "Section Break",
+					label: "Other",
+				},
+				{
+					fieldtype: "Link",
+					fieldname: "business_source",
+					label: "Business Source",
+					options: "Business Source Category",
+				},
+				{ fieldtype: "Column Break" },
+				{
+					fieldtype: "Currency",
+					fieldname: "deposit_amount",
+					label: "Deposit",
 					default: 0,
 				},
 			],
@@ -390,6 +476,10 @@ class RoomBoard {
 						expected_check_out: values.expected_check_out,
 						room_rate: values.room_rate,
 						rate_type: values.rate_type || null,
+						adults: values.adults || 1,
+						children: values.children || 0,
+						business_source: values.business_source || null,
+						deposit_amount: values.deposit_amount || 0,
 					},
 					btn: d.get_primary_btn(),
 					callback(r) {
@@ -406,32 +496,74 @@ class RoomBoard {
 			},
 		});
 
-		// Auto-fill room rate when rate type is selected
-		d.fields_dict["rate_type"].$input.on("change", () => {
-			const rate_type = d.get_value("rate_type");
-			if (!rate_type) return;
-
-			frappe.db.get_doc("Rate Type", rate_type).then(rate => {
-				let resolved = null;
-				const today = frappe.datetime.get_today();
-
-				if (rate.rate_schedule && rate.rate_schedule.length) {
-					for (const row of rate.rate_schedule) {
-						const type_match = !row.room_type || row.room_type === room.room_type;
-						const in_range   = (!row.from_date || row.from_date <= today) &&
-						                   (!row.to_date   || row.to_date   >= today);
-						if (type_match && in_range && row.rate) {
-							resolved = row.rate;
-							break;
-						}
-					}
-				}
-
-				if (!resolved && rate.base_rate) resolved = rate.base_rate;
-				if (resolved) d.set_value("room_rate", resolved);
-			});
-		});
-
 		d.show();
 	}
+}
+
+// ─── Dialog helpers ───────────────────────────────────────────────────────
+
+function format_currency(val) {
+	return frappe.format(val, { fieldtype: "Currency" });
+}
+
+function recalc_nights(d) {
+	const ci = d.get_value("expected_check_in");
+	const co = d.get_value("expected_check_out");
+	if (!ci || !co) return;
+	const diff = frappe.datetime.get_day_diff(co.split(" ")[0], ci.split(" ")[0]);
+	if (diff > 0) d.set_value("nights", diff);
+}
+
+function resolve_rate(d, room) {
+	const rate_type = d.get_value("rate_type");
+
+	if (!rate_type) {
+		d.fields_dict.rate_info.wrapper.innerHTML = "";
+		return;
+	}
+
+	const check_in_dt = d.get_value("expected_check_in");
+	const check_date  = check_in_dt ? check_in_dt.split(" ")[0] : frappe.datetime.get_today();
+	const adults      = d.get_value("adults") || 1;
+
+	frappe.db.get_doc("Rate Type", rate_type).then(rate => {
+		// Resolve rate from schedule
+		let resolved = null;
+		if (rate.rate_schedule && rate.rate_schedule.length) {
+			for (const row of rate.rate_schedule) {
+				const type_match = !row.room_type || row.room_type === room.room_type;
+				const in_range   = (!row.from_date || row.from_date <= check_date) &&
+				                   (!row.to_date   || row.to_date   >= check_date);
+				if (type_match && in_range && row.rate) {
+					resolved = row.rate;
+					break;
+				}
+			}
+		}
+		if (!resolved && rate.base_rate) resolved = rate.base_rate;
+
+		// Per Person pricing multiplies by adult count
+		if (resolved && rate.pricing_method === "Per Person") {
+			resolved = resolved * adults;
+		}
+
+		if (resolved) d.set_value("room_rate", resolved);
+
+		// Build info badge
+		const badges = [];
+		if (rate.includes_breakfast) badges.push(`<span class="badge badge-info" style="margin-right:4px;">Breakfast incl.</span>`);
+		if (rate.includes_taxes)     badges.push(`<span class="badge badge-info" style="margin-right:4px;">Tax incl.</span>`);
+		if (rate.minimum_stay_nights) badges.push(`<span class="badge badge-warning" style="margin-right:4px;">Min ${rate.minimum_stay_nights} nights</span>`);
+		if (rate.pricing_method)     badges.push(`<span class="badge badge-default" style="margin-right:4px;">${rate.pricing_method}</span>`);
+
+		const sell_msg = rate.sell_message
+			? `<div style="margin-top:6px; color: var(--text-muted); font-size: 0.85em; font-style: italic;">${frappe.utils.escape_html(rate.sell_message)}</div>`
+			: "";
+
+		d.fields_dict.rate_info.wrapper.innerHTML = `
+			<div style="padding: 6px 0 2px 0;">
+				${badges.join("")}
+				${sell_msg}
+			</div>`;
+	});
 }

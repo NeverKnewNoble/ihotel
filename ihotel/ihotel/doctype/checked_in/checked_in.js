@@ -58,7 +58,7 @@ frappe.ui.form.on("Checked In", {
 						frm.save();
 					}
 				);
-			});
+			}).addClass("btn-primary");
 		}
 
 		if (frm.doc.status === "Checked In" && !frm.is_new()) {
@@ -86,30 +86,36 @@ frappe.ui.form.on("Checked In", {
 				}, __("Guest Services")
 			);
 
+
 			frm.add_custom_button(__("Check Out"), function() {
 				const do_checkout = () => {
 					frm.set_value("status", "Checked Out");
 					frm.set_value("actual_check_out", frappe.datetime.now_datetime());
 					frm.save();
 				};
-				if (frm.doc.profile) {
-					frappe.db.get_value("iHotel Profile", frm.doc.profile, ["outstanding_balance"])
-					.then(r => {
-						const bal = r.message && parseFloat(r.message.outstanding_balance || 0);
+				// Always fetch profile from DB — frm.doc.profile may be stale
+				// if the folio was created after the form was last loaded
+				frappe.db.get_value("Checked In", frm.doc.name, "profile").then(r => {
+					const profile = r.message && r.message.profile;
+					if (!profile) {
+						do_checkout();
+						return;
+					}
+					frappe.db.get_value("iHotel Profile", profile, "outstanding_balance").then(r2 => {
+						const bal = parseFloat((r2.message && r2.message.outstanding_balance) || 0);
 						if (bal > 0) {
-							frappe.confirm(
-								__("Folio has an outstanding balance of {0}. Check out anyway?",
-									[format_currency(bal)]),
-								do_checkout
-							);
+							frappe.msgprint({
+								title: __("Outstanding Balance"),
+								message: __("Cannot check out {0}. Outstanding balance of {1} must be settled before checkout.",
+									[frm.doc.guest, format_currency(bal)]),
+								indicator: "red",
+							});
 						} else {
 							do_checkout();
 						}
 					});
-				} else {
-					do_checkout();
-				}
-			});
+				});
+			}).addClass("btn-danger");
 
 			frm.add_custom_button(__("Extend Stay"), function() {
 				const d = new frappe.ui.Dialog({
@@ -202,6 +208,17 @@ frappe.ui.form.on("Checked In", {
 				});
 				d.show();
 			}, __("Actions"));
+
+		}
+
+		// Color all custom action buttons (skip any already marked danger)
+		frm.page.custom_actions.find("button:not(.btn-danger)")
+			.removeClass("btn-default btn-secondary").addClass("btn-primary");
+	},
+
+	guest(frm) {
+		if (frm.doc.guest) {
+			show_guest_bad_traces_alert(frm.doc.guest);
 		}
 	},
 
@@ -277,6 +294,49 @@ frappe.ui.form.on("Checked In", {
 		}
 	},
 });
+
+// ── Guest Traces alert ────────────────────────────────────────────────────────
+
+function show_guest_bad_traces_alert(guest_name) {
+	frappe.call({
+		method: "ihotel.ihotel.doctype.guest.guest.get_guest_bad_traces",
+		args: { guest_name },
+		callback(r) {
+			const traces = r.message || [];
+			if (!traces.length) return;
+
+			const rows = traces.map(t =>
+				`<tr>
+					<td style="padding:4px 8px;border:1px solid #e2e2e2">${frappe.utils.escape_html(t.category)}</td>
+					<td style="padding:4px 8px;border:1px solid #e2e2e2">${t.date || ""}</td>
+					<td style="padding:4px 8px;border:1px solid #e2e2e2">${frappe.utils.escape_html(t.description || "")}</td>
+					<td style="padding:4px 8px;border:1px solid #e2e2e2">${frappe.utils.escape_html(t.recorded_by || "")}</td>
+				</tr>`
+			).join("");
+
+			frappe.msgprint({
+				title: __("⚠ Guest Has Bad History"),
+				indicator: "red",
+				message: `
+					<p style="color:#e03e3e;font-weight:600;margin-bottom:8px">
+						${__("This guest has {0} bad trace(s) on record:", [traces.length])}
+					</p>
+					<table style="width:100%;border-collapse:collapse;font-size:12px">
+						<thead>
+							<tr style="background:#fce8e8">
+								<th style="padding:4px 8px;border:1px solid #e2e2e2;text-align:left">${__("Category")}</th>
+								<th style="padding:4px 8px;border:1px solid #e2e2e2;text-align:left">${__("Date")}</th>
+								<th style="padding:4px 8px;border:1px solid #e2e2e2;text-align:left">${__("Description")}</th>
+								<th style="padding:4px 8px;border:1px solid #e2e2e2;text-align:left">${__("Recorded By")}</th>
+							</tr>
+						</thead>
+						<tbody>${rows}</tbody>
+					</table>
+				`,
+			});
+		},
+	});
+}
 
 // ── Stay Service Item events ──────────────────────────────────────────────────
 frappe.ui.form.on("Stay Service Item", {

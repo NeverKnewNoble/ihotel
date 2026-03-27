@@ -1,0 +1,70 @@
+{
+ "actions": [],
+ "creation": "2026-03-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "room",
+  "floor",
+  "room_type",
+  "task_status",
+  "notes"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "fieldname": "room",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Room",
+   "options": "Room",
+   "reqd": 1
+  },
+  {
+   "columns": 1,
+   "fetch_from": "room.floor",
+   "fieldname": "floor",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Floor",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "fetch_from": "room.room_type",
+   "fieldname": "room_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Room Type",
+   "options": "Room Type",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "default": "Pending",
+   "fieldname": "task_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Pending\nIn Progress\nCompleted"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-27 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "iHotel",
+ "name": "Assignment Room",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

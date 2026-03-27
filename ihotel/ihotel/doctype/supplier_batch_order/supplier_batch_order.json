@@ -1,0 +1,56 @@
+{
+ "actions": [],
+ "creation": "2026-03-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "laundry_order",
+  "items_count",
+  "order_value",
+  "status"
+ ],
+ "fields": [
+  {
+   "fieldname": "laundry_order",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Laundry Order",
+   "options": "Laundry Order"
+  },
+  {
+   "fieldname": "items_count",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Items",
+   "read_only": 1
+  },
+  {
+   "fieldname": "order_value",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Value",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Order Status",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-03-27 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "iHotel",
+ "name": "Supplier Batch Order",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -47,6 +47,10 @@ frappe.ui.form.on("Group Reservation", {
 			}).addClass("btn-primary");
 		}
 
+		// Color all custom action buttons
+		frm.page.custom_actions.find("button")
+			.removeClass("btn-default btn-secondary").addClass("btn-primary");
+
 		// Show linked reservations count
 		if (!frm.is_new()) {
 			frappe.call({

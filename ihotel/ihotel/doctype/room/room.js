@@ -14,12 +14,12 @@ frappe.ui.form.on("Room", {
 				if (r.message && r.message.name) {
 					frm.add_custom_button(__("View Stay"), function() {
 						frappe.set_route("Form", "Checked In", r.message.name);
-					});
+					}).addClass("btn-primary");
 				}
 			});
 		}
 	},
-	
+
 	// Auto-update status based on room type selection
 	room_type(frm) {
 		if (frm.doc.room_type && !frm.doc.status) {

@@ -11,6 +11,7 @@ fixtures = [
 	{"doctype": "Business Source Type", "filters": [["module" , "in" , ("ihotel" )]]},
 	{"doctype": "Business Channel Category", "filters": [["module" , "in" , ("ihotel" )]]},
 	{"doctype": "Notification", "filters": [["name", "=", "Reservation Confirmation Letter"]]},
+	{"doctype": "Workspace Sidebar", "filters": [["name", "=", "iHotel"]]},
 ]
 
 # Apps
