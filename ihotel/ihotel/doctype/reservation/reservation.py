@@ -191,11 +191,14 @@ class Reservation(Document):
 			self.cancellation_fee = 0
 
 	def validate_payment_method(self):
-		"""Require card details when payment method is Credit Card."""
+		"""Require card details when payment method is Credit Card.
+		Direct Bill is restricted to Company guarantee type only."""
 		if self.payment_method in ("Visa", "Mastercard", "Amex", "Credit Card"):
 			if not self.credit_card_type:
 				frappe.throw(_("Please specify the Credit Card Type for payment method {0}.").format(
 					self.payment_method))
+		if self.payment_method == "Direct Bill" and self.guarantee_type != "Company":
+			frappe.throw(_("Direct Bill payment requires Guarantee Type to be set to Company."))
 
 	def sync_guest_details(self):
 		"""If a Guest profile is selected, auto-fill contact fields."""
@@ -208,6 +211,128 @@ class Reservation(Document):
 				self.phone_number = guest.phone
 			if not self.date_of_birth:
 				self.date_of_birth = guest.date_of_birth
+
+
+@frappe.whitelist()
+def create_proforma_invoice(reservation_name):
+	"""Create a draft Sales Invoice (proforma) for the reservation."""
+	res = frappe.get_doc("Reservation", reservation_name)
+
+	if res.proforma_invoice:
+		frappe.throw(_("A proforma invoice already exists for this reservation: {0}").format(
+			res.proforma_invoice
+		))
+
+	if res.status == "cancelled":
+		frappe.throw(_("Cannot create a proforma invoice for a cancelled reservation."))
+
+	settings = frappe.get_cached_doc("iHotel Settings")
+
+	company = settings.company
+	if not company:
+		frappe.throw(_("Please set Company in iHotel Settings → Accounting before creating a proforma invoice."))
+
+	room_charge_item = settings.room_charge_item
+	if not room_charge_item:
+		frappe.throw(_("Please set Room Charge Item in iHotel Settings → Accounting before creating a proforma invoice."))
+
+	# Resolve or create the customer
+	customer = res.customer_id
+	if not customer:
+		guest_name = res.full_name or (
+			frappe.db.get_value("Guest", res.guest, "guest_name") if res.guest else None
+		)
+		if not guest_name:
+			frappe.throw(_("Please set a Guest Profile or Full Name on the reservation before creating a proforma invoice."))
+
+		customer = frappe.db.get_value("Customer", {"customer_name": guest_name})
+		if not customer:
+			cust = frappe.get_doc({
+				"doctype": "Customer",
+				"customer_name": guest_name,
+				"customer_type": "Individual",
+				"customer_group": settings.default_customer_group or "All Customer Groups",
+				"territory": settings.default_territory or "All Territories",
+			})
+			cust.insert(ignore_permissions=True)
+			customer = cust.name
+
+	income_account = settings.room_revenue_account or None
+
+	# Build invoice items from rate_lines
+	items = []
+	for line in (res.rate_lines or []):
+		item_row = {
+			"item_code": room_charge_item,
+			"item_name": line.description or line.rate_type or "Room Charge",
+			"description": "{0} | Room: {1} | {2} to {3}".format(
+				line.description or line.rate_type or "Room Charge",
+				res.room or res.room_type or "-",
+				res.check_in_date or "-",
+				res.check_out_date or "-",
+			),
+			"qty": 1,
+			"rate": line.amount or 0,
+		}
+		if income_account:
+			item_row["income_account"] = income_account
+		items.append(item_row)
+
+	if not items:
+		# Fallback: single line for total charges
+		item_row = {
+			"item_code": room_charge_item,
+			"item_name": "Room Charge",
+			"description": "Room Charge | {0} | {1} to {2}".format(
+				res.room_type or res.room or "-",
+				res.check_in_date or "-",
+				res.check_out_date or "-",
+			),
+			"qty": 1,
+			"rate": res.total_charges or 0,
+		}
+		if income_account:
+			item_row["income_account"] = income_account
+		items.append(item_row)
+
+	# Tax as a separate line if applicable
+	if (res.tax or 0) > 0:
+		tax_row = {
+			"item_code": room_charge_item,
+			"item_name": "Tax",
+			"description": "Tax on room charges",
+			"qty": 1,
+			"rate": res.tax,
+		}
+		if income_account:
+			tax_row["income_account"] = income_account
+		items.append(tax_row)
+
+	sinv = frappe.get_doc({
+		"doctype": "Sales Invoice",
+		"customer": customer,
+		"company": company,
+		"posting_date": frappe.utils.today(),
+		"due_date": str(res.check_in_date) if res.check_in_date else frappe.utils.today(),
+		"remarks": _("Proforma Invoice for Reservation {0}").format(reservation_name),
+		"is_return": 0,
+		"disable_rounded_total": 1,
+		"items": items,
+	})
+	sinv.flags.ignore_permissions = True
+	sinv.insert()
+
+	res.db_set("proforma_invoice", sinv.name)
+
+	frappe.msgprint(
+		_("Proforma Invoice {0} created successfully.").format(
+			frappe.utils.get_link_to_form("Sales Invoice", sinv.name)
+		),
+		indicator="green",
+		alert=True,
+	)
+
+	return sinv.name
 
 
 @frappe.whitelist()
@@ -246,19 +371,80 @@ def convert_to_hotel_stay(reservation_name):
 		check_out_time = str(reservation.check_out_time or "11:00:00")
 		check_out_dt = f"{reservation.check_out_date} {check_out_time}"
 
+	# Map reservation payment method → folio payment method + detail
+	pm      = reservation.payment_method or ""
+	cc_type = reservation.credit_card_type or ""
+
+	if pm == "Credit Card":
+		method_map = {
+			"Visa":             "Visa",
+			"Mastercard":       "Mastercard",
+			"American Express": "Amex",
+		}
+		deposit_method = method_map.get(cc_type, "Visa")
+		detail_parts   = [cc_type or "Credit Card"]
+		if reservation.credit_card_last4:
+			detail_parts.append(f"ending {reservation.credit_card_last4}")
+		if reservation.card_expiry:
+			detail_parts.append(f"exp {reservation.card_expiry}")
+		payment_detail = " ".join(detail_parts)
+
+	elif pm == "Cash":
+		deposit_method = "Cash"
+		payment_detail = "Cash"
+
+	elif pm == "Cheque":
+		deposit_method = "Cheque"
+		parts = []
+		if reservation.cheque_number:
+			parts.append(f"Cheque #{reservation.cheque_number}")
+		if reservation.bank_name:
+			parts.append(f"Bank: {reservation.bank_name}")
+		if reservation.bank_account_no:
+			parts.append(f"Acct: {reservation.bank_account_no}")
+		payment_detail = " | ".join(parts) if parts else "Cheque"
+
+	elif pm == "Direct Bill":
+		deposit_method = "City Ledger"
+		payment_detail = f"Direct Bill — {reservation.customer_id or ''}"
+
+	else:
+		deposit_method = None
+		payment_detail = ""
+
+	# Copy all rate lines so totals, tax, and folio charges are computed correctly
+	rate_lines = [
+		{
+			"rate_type":    rl.rate_type,
+			"room_type":    rl.room_type,
+			"rate_column":  rl.rate_column,
+			"description":  rl.description,
+			"rate":         rl.rate,
+			"discount1":    rl.discount1 or 0,
+			"discount2":    rl.discount2 or 0,
+			"discount3":    rl.discount3 or 0,
+			"amount":       rl.amount,
+		}
+		for rl in (reservation.rate_lines or [])
+	]
+
 	hotel_stay = frappe.get_doc({
-		"doctype": "Checked In",
-		"guest": guest,
-		"room": reservation.room,
-		"room_type": reservation.room_type,
-		"expected_check_in": check_in_dt,
-		"expected_check_out": check_out_dt,
-		"room_rate": reservation.rent,
-		"rate_type": reservation.rate_type,
-		"business_source": reservation.business_source_category,
-		"status": "Reserved",
-		"deposit_amount": reservation.deposit or 0,
-		"deposit_received": reservation.deposit_received or 0,
+		"doctype":              "Checked In",
+		"guest":                guest,
+		"room":                 reservation.room,
+		"room_type":            reservation.room_type,
+		"expected_check_in":    check_in_dt,
+		"expected_check_out":   check_out_dt,
+		"color":                reservation.color,
+		"adults":               reservation.adults or 1,
+		"children":             reservation.children or 0,
+		"business_source":      reservation.business_source_category,
+		"turndown_requested":   reservation.turndown_requested or 0,
+		"status":               "Reserved",
+		"deposit_amount":       reservation.deposit or 0,
+		"deposit_method":       deposit_method or "",
+		"payment_detail":       payment_detail,
+		"rate_lines":           rate_lines,
 	})
 	hotel_stay.insert(ignore_permissions=True)
 

@@ -249,6 +249,18 @@ class CheckedIn(Document):
                     ", ".join(allowed) if allowed else _("None")
                 )
             )
+        if self.status == "Checked Out":
+            # Always read from DB — self.profile may be stale if folio was created after submit
+            profile_name = frappe.db.get_value("Checked In", self.name, "profile") or self.profile
+            if profile_name:
+                outstanding = frappe.db.get_value("iHotel Profile", profile_name, "outstanding_balance") or 0
+                if outstanding > 0:
+                    frappe.throw(
+                        _("Cannot check out {0}. Outstanding balance of {1} must be settled before checkout.").format(
+                            self.guest, frappe.format_value(outstanding, {"fieldtype": "Currency"})
+                        ),
+                        title=_("Outstanding Balance")
+                    )
 
     def validate_dates(self):
         """
@@ -453,11 +465,34 @@ class CheckedIn(Document):
                 reference_name=self.name,
             )
 
-        # Post deposit as a folio payment if already collected
-        if self.deposit_received and flt(self.deposit_amount) > 0:
+        # Post payment row from reservation billing method (or deposit if collected)
+        if getattr(self, "deposit_method", None):
+            if flt(self.deposit_amount) > 0:
+                # Deposit was collected — mark as paid
+                profile.append("payments", {
+                    "date": nowdate(),
+                    "payment_method": self.deposit_method,
+                    "detail": self.payment_detail or _("Deposit collected at check-in"),
+                    "rate": flt(self.deposit_amount),
+                    "payment_status": "Paid",
+                })
+            else:
+                # No deposit collected — pre-fill the expected billing method as pending
+                expected_amount = flt(self.total_amount) or flt(self.total_charges) or 0
+                if expected_amount > 0:
+                    profile.append("payments", {
+                        "date": nowdate(),
+                        "payment_method": self.deposit_method,
+                        "detail": self.payment_detail or _("Guaranteed billing method"),
+                        "rate": expected_amount,
+                        "payment_status": "Pending payment",
+                    })
+            profile.save(ignore_permissions=True)
+        elif flt(self.deposit_amount) > 0:
+            # Fallback: deposit with no method recorded
             profile.append("payments", {
                 "date": nowdate(),
-                "payment_method": self.deposit_method or "Cash",
+                "payment_method": "Cash",
                 "detail": _("Deposit collected at check-in"),
                 "rate": flt(self.deposit_amount),
                 "payment_status": "Paid",

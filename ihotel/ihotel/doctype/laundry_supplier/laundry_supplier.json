@@ -1,0 +1,156 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:supplier_name",
+ "creation": "2026-03-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "supplier_name",
+  "supplier",
+  "is_active",
+  "column_break_ls1",
+  "contact_person",
+  "phone",
+  "email",
+  "section_break_ls2",
+  "pickup_schedule",
+  "pickup_time",
+  "column_break_ls3",
+  "delivery_time",
+  "lead_time_hours",
+  "section_break_ls4",
+  "minimum_order",
+  "section_break_ls5",
+  "pricing_notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "supplier_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Supplier Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "ERPNext Supplier",
+   "options": "Supplier"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Active"
+  },
+  {
+   "fieldname": "column_break_ls1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "contact_person",
+   "fieldtype": "Data",
+   "label": "Contact Person"
+  },
+  {
+   "fieldname": "phone",
+   "fieldtype": "Phone",
+   "label": "Phone"
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "section_break_ls2",
+   "fieldtype": "Section Break",
+   "label": "Schedule"
+  },
+  {
+   "fieldname": "pickup_schedule",
+   "fieldtype": "Select",
+   "label": "Pickup Schedule",
+   "options": "\nDaily\nEvery Other Day\nWeekly\nTwice Weekly\nOn Demand"
+  },
+  {
+   "fieldname": "pickup_time",
+   "fieldtype": "Time",
+   "label": "Pickup Time"
+  },
+  {
+   "fieldname": "column_break_ls3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "delivery_time",
+   "fieldtype": "Time",
+   "label": "Delivery Time"
+  },
+  {
+   "fieldname": "lead_time_hours",
+   "fieldtype": "Int",
+   "label": "Lead Time (Hours)"
+  },
+  {
+   "fieldname": "section_break_ls4",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "minimum_order",
+   "fieldtype": "Float",
+   "label": "Minimum Pieces per Batch"
+  },
+  {
+   "fieldname": "section_break_ls5",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "pricing_notes",
+   "fieldtype": "Small Text",
+   "label": "Pricing Notes"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-27 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "iHotel",
+ "name": "Laundry Supplier",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "General Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Laundry Manager",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Laundry Supervisor"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,130 @@
+{
+ "actions": [],
+ "creation": "2026-03-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "default_income_account",
+  "default_expense_account",
+  "column_break_lset1",
+  "default_warehouse",
+  "auto_create_sales_invoice",
+  "section_break_lset2",
+  "enable_sms_notifications",
+  "sms_gateway_url",
+  "column_break_lset3",
+  "sms_api_key",
+  "section_break_lset4",
+  "pms_integration_url",
+  "column_break_lset5",
+  "pms_api_key"
+ ],
+ "fields": [
+  {
+   "fieldname": "default_income_account",
+   "fieldtype": "Link",
+   "label": "Default Income Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "default_expense_account",
+   "fieldtype": "Link",
+   "label": "Default Expense Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "column_break_lset1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "default_warehouse",
+   "fieldtype": "Link",
+   "label": "Default Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "default": "0",
+   "fieldname": "auto_create_sales_invoice",
+   "fieldtype": "Check",
+   "label": "Auto-Create Sales Invoice on Delivery"
+  },
+  {
+   "fieldname": "section_break_lset2",
+   "fieldtype": "Section Break",
+   "label": "SMS Notifications"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_sms_notifications",
+   "fieldtype": "Check",
+   "label": "Enable SMS Notifications"
+  },
+  {
+   "depends_on": "eval:doc.enable_sms_notifications == 1",
+   "fieldname": "sms_gateway_url",
+   "fieldtype": "Data",
+   "label": "SMS Gateway URL"
+  },
+  {
+   "fieldname": "column_break_lset3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.enable_sms_notifications == 1",
+   "fieldname": "sms_api_key",
+   "fieldtype": "Password",
+   "label": "SMS API Key"
+  },
+  {
+   "fieldname": "section_break_lset4",
+   "fieldtype": "Section Break",
+   "label": "PMS Integration"
+  },
+  {
+   "fieldname": "pms_integration_url",
+   "fieldtype": "Data",
+   "label": "PMS Integration URL"
+  },
+  {
+   "fieldname": "column_break_lset5",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pms_api_key",
+   "fieldtype": "Password",
+   "label": "PMS API Key"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-03-27 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "iHotel",
+ "name": "Laundry Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "General Manager",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Laundry Manager",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

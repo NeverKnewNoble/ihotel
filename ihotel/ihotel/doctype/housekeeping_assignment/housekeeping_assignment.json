@@ -1,0 +1,110 @@
+{
+ "actions": [],
+ "autoname": "format:HA-{####}",
+ "creation": "2026-03-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "housekeeper",
+  "column_break_ha1",
+  "date",
+  "status",
+  "section_break_ha2",
+  "rooms",
+  "section_break_ha3",
+  "notes",
+  "notification_sent"
+ ],
+ "fields": [
+  {
+   "fieldname": "housekeeper",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Housekeeper",
+   "options": "Housekeeper",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_ha1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "reqd": 1
+  },
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Open\nIn Progress\nCompleted"
+  },
+  {
+   "fieldname": "section_break_ha2",
+   "fieldtype": "Section Break",
+   "label": "Assigned Rooms"
+  },
+  {
+   "fieldname": "rooms",
+   "fieldtype": "Table",
+   "label": "Rooms",
+   "options": "Assignment Room"
+  },
+  {
+   "fieldname": "section_break_ha3",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes / Instructions"
+  },
+  {
+   "default": "0",
+   "fieldname": "notification_sent",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Notification Sent",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-27 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "iHotel",
+ "name": "Housekeeping Assignment",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1, "delete": 1, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "System Manager",
+   "share": 1, "write": 1
+  },
+  {
+   "create": 1, "delete": 1, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "General Manager",
+   "share": 1, "write": 1
+  },
+  {
+   "create": 1, "email": 1, "export": 1,
+   "print": 1, "read": 1, "report": 1, "role": "Front Desk Agent",
+   "share": 1, "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [
+  {"color": "Blue",  "title": "Open"},
+  {"color": "Orange","title": "In Progress"},
+  {"color": "Green", "title": "Completed"}
+ ]
+}

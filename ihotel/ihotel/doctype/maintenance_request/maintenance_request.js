@@ -9,21 +9,21 @@ frappe.ui.form.on("Maintenance Request", {
 			frm.add_custom_button(__("Mark In Progress"), function () {
 				frm.set_value("status", "In Progress");
 				frm.save();
-			});
+			}).addClass("btn-primary");
 		}
 
 		if (frm.doc.status === "In Progress") {
 			frm.add_custom_button(__("Mark Resolved"), function () {
 				frm.set_value("status", "Resolved");
 				frm.save();
-			});
+			}).addClass("btn-primary");
 		}
 
 		if (frm.doc.status === "Resolved") {
 			frm.add_custom_button(__("Close"), function () {
 				frm.set_value("status", "Closed");
 				frm.save();
-			});
+			}).addClass("btn-primary");
 		}
 
 		// Place Room OOO button — only when room is set and no OOO linked yet
@@ -95,5 +95,9 @@ frappe.ui.form.on("Maintenance Request", {
 				frappe.set_route("room-maintenance-history", { room: frm.doc.room });
 			}, __("Actions"));
 		}
+
+		// Color all custom action buttons
+		frm.page.custom_actions.find("button")
+			.removeClass("btn-default btn-secondary").addClass("btn-primary");
 	},
 });

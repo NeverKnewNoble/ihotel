@@ -31,6 +31,9 @@ frappe.ui.form.on("Rate Type", {
 			});
 		}, __("Actions"));
 
+		frm.page.custom_actions.find("button")
+			.removeClass("btn-default btn-secondary").addClass("btn-primary");
+
 		frm.trigger("calculate_effective_tax");
 	},
 

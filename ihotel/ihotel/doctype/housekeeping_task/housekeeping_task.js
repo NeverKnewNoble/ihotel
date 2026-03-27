@@ -10,7 +10,7 @@ frappe.ui.form.on("Housekeeping Task", {
 				frm.set_value("status", "In Progress");
 				frm.set_value("assigned_date", frappe.datetime.now_datetime());
 				frm.save();
-			});
+			}).addClass("btn-primary");
 		}
 
 		if (frm.doc.status === "In Progress") {
@@ -18,7 +18,7 @@ frappe.ui.form.on("Housekeeping Task", {
 				frm.set_value("status", "Completed");
 				frm.set_value("cleaned_date", frappe.datetime.now_datetime());
 				frm.save();
-			});
+			}).addClass("btn-primary");
 		}
 	},
 });

@@ -29,7 +29,7 @@ frappe.ui.form.on("Night Audit", {
 					});
 				}
 			});
-		});
+		}).addClass("btn-primary");
 	},
 
 	audit_date(frm) {

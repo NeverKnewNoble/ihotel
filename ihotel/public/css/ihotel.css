@@ -15,3 +15,30 @@
 	color: var(--text-muted);
 	opacity: 0.4;
 }
+
+/* ── Calendar: bold date numbers ── */
+.fc-daygrid-day-number {
+	font-weight: 700;
+}
+
+/* ── Calendar: bold + centred + white event titles ── */
+.fc-event-title-container {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+}
+
+.fc-event-title {
+	color: #ffffff !important;
+	font-weight: 700 !important;
+	text-align: center;
+	white-space: normal;
+	line-height: 1.2;
+}
+
+/* fallback: also target the custom eventContent div */
+.fc-event .ihotel-event-label {
+	color: #ffffff !important;
+	font-weight: 700 !important;
+}

@@ -12,7 +12,9 @@
   "rate",
   "amount",
   "reference_doctype",
-  "reference_name"
+  "reference_name",
+  "print_charge",
+  "scan_charge"
  ],
  "fields": [
   {
@@ -65,12 +67,24 @@
    "fieldname": "reference_name",
    "fieldtype": "Data",
    "label": "Ref. Name"
+  },
+  {
+   "fieldname": "print_charge",
+   "fieldtype": "Button",
+   "in_list_view": 1,
+   "label": "Print"
+  },
+  {
+   "fieldname": "scan_charge",
+   "fieldtype": "Button",
+   "in_list_view": 1,
+   "label": "Scan"
   }
  ],
  "index_web_pages_for_search": 0,
  "istable": 1,
  "links": [],
- "modified": "2026-03-20 00:00:00.000000",
+ "modified": "2026-03-27 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Folio Charge",

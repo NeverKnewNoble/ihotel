@@ -25,9 +25,9 @@
   "business_source",
   "guest_services_section",
   "do_not_disturb",
-  "make_up_room",
-  "column_break_gsvc",
   "turndown_requested",
+  "column_break_gsvc",
+  "make_up_room",
   "section_break_ygin",
   "additional_services",
   "rate_tab",
@@ -45,6 +45,8 @@
   "total_amount",
   "section_break_xjeh",
   "deposit_amount",
+  "deposit_method",
+  "payment_detail",
   "folio_tab",
   "profile",
   "sales_invoice",
@@ -77,7 +79,8 @@
    "fieldname": "expected_check_in",
    "fieldtype": "Datetime",
    "in_list_view": 1,
-   "label": "Expected Check In"
+   "label": "Expected Check In",
+   "reqd": 1
   },
   {
    "allow_on_submit": 1,
@@ -94,7 +97,8 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Room",
-   "options": "Room"
+   "options": "Room",
+   "reqd": 1
   },
   {
    "fieldname": "expected_check_out",
@@ -179,6 +183,19 @@
    "label": "Deposit"
   },
   {
+   "fieldname": "deposit_method",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Deposit Method",
+   "options": "Cash\nVisa\nMastercard\nAmex\nBank Transfer\nCheque\nCity Ledger\nComplimentary"
+  },
+  {
+   "fieldname": "payment_detail",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Payment Detail"
+  },
+  {
    "fieldname": "guest_services_section",
    "fieldtype": "Section Break",
    "label": "Guest Services"
@@ -193,6 +210,14 @@
   {
    "allow_on_submit": 1,
    "default": "0",
+   "fieldname": "turndown_requested",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Turndown Requested"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
    "fieldname": "make_up_room",
    "fieldtype": "Check",
    "label": "Make Up Room"
@@ -200,13 +225,6 @@
   {
    "fieldname": "column_break_gsvc",
    "fieldtype": "Column Break"
-  },
-  {
-   "allow_on_submit": 1,
-   "default": "0",
-   "fieldname": "turndown_requested",
-   "fieldtype": "Check",
-   "label": "Turndown Requested"
   },
   {
    "fieldname": "section_break_ygin",
@@ -323,7 +341,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-25 10:02:04.910836",
+ "modified": "2026-03-25 22:33:44.861355",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Checked In",

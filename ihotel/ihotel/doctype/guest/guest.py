@@ -25,6 +25,17 @@ class Guest(Document):
 
 
 @frappe.whitelist()
+def get_guest_bad_traces(guest_name):
+	"""Return all Bad traces for a guest."""
+	return frappe.db.get_all(
+		"Guest Trace",
+		filters={"parent": guest_name, "parenttype": "Guest", "trace_type": "Bad"},
+		fields=["category", "date", "description", "recorded_by"],
+		order_by="date desc",
+	)
+
+
+@frappe.whitelist()
 def get_guest_stats(guest_name):
 	"""Return computed stay statistics for a guest."""
 	result = frappe.db.sql("""

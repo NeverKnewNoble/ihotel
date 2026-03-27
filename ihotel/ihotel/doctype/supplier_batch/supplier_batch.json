@@ -1,0 +1,185 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-03-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "batch_date",
+  "supplier",
+  "status",
+  "column_break_sb1",
+  "total_items",
+  "total_value",
+  "section_break_sb_orders",
+  "orders",
+  "section_break_sb_logistics",
+  "pickup_datetime",
+  "column_break_sb2",
+  "return_datetime",
+  "section_break_sb_invoice",
+  "supplier_invoice_no",
+  "supplier_invoice_amount",
+  "column_break_sb3",
+  "supplier_invoice",
+  "section_break_sb_notes",
+  "notes"
+ ],
+ "fields": [
+  {
+   "default": "VB-.YYYY.-",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "VB-.YYYY.-"
+  },
+  {
+   "default": "Today",
+   "fieldname": "batch_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Batch Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Laundry Supplier",
+   "options": "Laundry Supplier",
+   "reqd": 1
+  },
+  {
+   "default": "Pending Pickup",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Pending Pickup\nWith Supplier\nReturned\nCompleted"
+  },
+  {
+   "fieldname": "column_break_sb1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "total_items",
+   "fieldtype": "Int",
+   "label": "Total Items",
+   "read_only": 1
+  },
+  {
+   "default": "0.00",
+   "fieldname": "total_value",
+   "fieldtype": "Currency",
+   "label": "Total Value",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_sb_orders",
+   "fieldtype": "Section Break",
+   "label": "Orders"
+  },
+  {
+   "fieldname": "orders",
+   "fieldtype": "Table",
+   "label": "Orders",
+   "options": "Supplier Batch Order"
+  },
+  {
+   "fieldname": "section_break_sb_logistics",
+   "fieldtype": "Section Break",
+   "label": "Logistics"
+  },
+  {
+   "fieldname": "pickup_datetime",
+   "fieldtype": "Datetime",
+   "label": "Pickup Date/Time"
+  },
+  {
+   "fieldname": "column_break_sb2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "return_datetime",
+   "fieldtype": "Datetime",
+   "label": "Return Date/Time"
+  },
+  {
+   "fieldname": "section_break_sb_invoice",
+   "fieldtype": "Section Break",
+   "label": "Supplier Invoice"
+  },
+  {
+   "fieldname": "supplier_invoice_no",
+   "fieldtype": "Data",
+   "label": "Supplier Invoice No"
+  },
+  {
+   "fieldname": "supplier_invoice_amount",
+   "fieldtype": "Currency",
+   "label": "Supplier Invoice Amount"
+  },
+  {
+   "fieldname": "column_break_sb3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "supplier_invoice",
+   "fieldtype": "Link",
+   "label": "Purchase Invoice",
+   "options": "Purchase Invoice"
+  },
+  {
+   "fieldname": "section_break_sb_notes",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-27 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "iHotel",
+ "name": "Supplier Batch",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "General Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Laundry Manager",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "role": "Laundry Supervisor"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

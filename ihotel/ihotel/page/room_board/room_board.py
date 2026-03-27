@@ -50,7 +50,10 @@ def get_room_board_data():
 
 
 @frappe.whitelist()
-def quick_check_in(room, guest, expected_check_in, expected_check_out, room_rate, rate_type=None):
+def quick_check_in(
+	room, guest, expected_check_in, expected_check_out, room_rate,
+	rate_type=None, adults=1, children=0, business_source=None, deposit_amount=0
+):
 	"""Create and submit a Checked In document directly from the Room Board."""
 	room_doc = frappe.get_doc("Room", room)
 
@@ -63,8 +66,11 @@ def quick_check_in(room, guest, expected_check_in, expected_check_out, room_rate
 		"actual_check_in": now_datetime(),
 		"expected_check_out": expected_check_out,
 		"room_rate": flt(room_rate),
-		"rate_type": rate_type or None,
 		"status": "Checked In",
+		"adults": int(adults or 1),
+		"children": int(children or 0),
+		"business_source": business_source or None,
+		"deposit_amount": flt(deposit_amount or 0),
 	})
 	doc.insert(ignore_permissions=True)
 	doc.submit()

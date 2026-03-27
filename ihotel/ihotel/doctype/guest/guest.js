@@ -17,6 +17,13 @@ frappe.ui.form.on("Guest", {
 				frm.page.set_indicator(__(frm.doc.vip_type), "orange");
 		}
 
+		render_id_scan_preview(frm);
+
+		// Scan ID button — always visible so staff can scan on new records too
+		frm.add_custom_button(__("Scan ID Document"), function () {
+			show_scan_dialog(frm);
+		}).addClass("btn-primary");
+
 		if (frm.is_new()) return;
 
 		// View Stay History button
@@ -26,10 +33,14 @@ frappe.ui.form.on("Guest", {
 			});
 		}, __("View"));
 
-		// New Reservation button
+		// New Checked In button
 		frm.add_custom_button(__("New Checked In"), function () {
 			frappe.new_doc("Checked In", { guest: frm.doc.name });
 		}, __("View"));
+
+		// Color all custom action buttons
+		frm.page.custom_actions.find("button")
+			.removeClass("btn-default btn-secondary").addClass("btn-primary");
 
 		// Load stay statistics into the Stats tab
 		frappe.call({
@@ -46,4 +57,170 @@ frappe.ui.form.on("Guest", {
 			},
 		});
 	},
+
+	id_scan(frm)      { render_id_scan_preview(frm); },
+	id_scan_back(frm) { render_id_scan_preview(frm); },
 });
+
+// ─── Scan dialog ──────────────────────────────────────────────────────────────
+
+function show_scan_dialog(frm) {
+	const has_front = !!frm.doc.id_scan;
+	const has_back  = !!frm.doc.id_scan_back;
+
+	const d = new frappe.ui.Dialog({
+		title: __("Scan ID Document"),
+		fields: [
+			{
+				fieldtype: "HTML",
+				options: `
+					<div style="margin-bottom: 12px; color: var(--text-muted); font-size: 0.88em; line-height: 1.5;">
+						Place the document on the scanner, then choose which side to capture.
+						Accepted formats: <b>JPG, PNG, PDF</b>.
+					</div>`,
+			},
+			{
+				fieldtype: "Select",
+				fieldname: "side",
+				label: "Document Side",
+				options: [
+					{ value: "front", label: `Front / Data Page${has_front ? "  ✓" : ""}` },
+					{ value: "back",  label: `Back / Signature Page${has_back ? "  ✓" : ""}` },
+				],
+				default: "front",
+			},
+		],
+		primary_action_label: __("Open Scanner / Browse"),
+		primary_action(values) {
+			d.hide();
+			const fieldname = values.side === "front" ? "id_scan" : "id_scan_back";
+			open_scanner(frm, fieldname, values.side);
+		},
+	});
+
+	d.show();
+}
+
+function open_scanner(frm, fieldname, side_label) {
+	const label = side_label === "front" ? __("Front") : __("Back");
+
+	// Save first if new so we have a docname to attach to
+	const do_upload = () => {
+		new frappe.ui.FileUploader({
+			doctype: frm.doctype,
+			docname: frm.docname,
+			frm: frm,
+			folder: "Home/Attachments",
+			allow_multiple: false,
+			restrictions: {
+				allowed_file_types: ["image/*", ".pdf"],
+			},
+			on_success(file_doc) {
+				frm.set_value(fieldname, file_doc.file_url);
+				frm.save().then(() => {
+					render_id_scan_preview(frm);
+					frappe.show_alert({
+						message: __("ID {0} scan saved", [label]),
+						indicator: "green",
+					}, 4);
+				});
+			},
+		});
+	};
+
+	if (frm.is_new()) {
+		frm.save().then(do_upload);
+	} else {
+		do_upload();
+	}
+}
+
+// ─── Preview panel ────────────────────────────────────────────────────────────
+
+function render_id_scan_preview(frm) {
+	const $wrapper = frm.fields_dict.id_scan_preview &&
+		frm.fields_dict.id_scan_preview.$wrapper;
+	if (!$wrapper) return;
+
+	const front = frm.doc.id_scan;
+	const back  = frm.doc.id_scan_back;
+
+	if (!front && !back) {
+		$wrapper.html(`
+			<div style="
+				border: 2px dashed var(--border-color);
+				border-radius: 8px;
+				padding: 28px 16px;
+				text-align: center;
+				color: var(--text-muted);
+				font-size: 0.88em;
+			">
+				<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"
+					viewBox="0 0 24 24" fill="none" stroke="currentColor"
+					stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+					style="margin-bottom: 8px; opacity: 0.4;">
+					<rect x="2" y="7" width="20" height="14" rx="2"/>
+					<path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+					<line x1="12" y1="12" x2="12" y2="16"/>
+					<line x1="10" y1="14" x2="14" y2="14"/>
+				</svg>
+				<div>No ID scan on file — click <b>Scan ID Document</b> to add one</div>
+			</div>`);
+		return;
+	}
+
+	const make_card = (url, title) => {
+		if (!url) {
+			return `
+				<div style="
+					flex: 1; border: 2px dashed var(--border-color);
+					border-radius: 8px; padding: 24px 12px;
+					text-align: center; color: var(--text-muted);
+					font-size: 0.82em; min-height: 120px;
+					display: flex; align-items: center; justify-content: center;
+				">
+					<div>
+						<div style="font-weight:600; margin-bottom: 4px;">${title}</div>
+						<div>Not scanned yet</div>
+					</div>
+				</div>`;
+		}
+
+		const is_pdf = url.toLowerCase().endsWith(".pdf");
+		const preview = is_pdf
+			? `<div style="padding: 20px 0; font-size: 0.85em;">
+					<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"
+						viewBox="0 0 24 24" fill="none" stroke="currentColor"
+						stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+						style="display:block; margin: 0 auto 6px;">
+						<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+						<polyline points="14 2 14 8 20 8"/>
+					</svg>
+					PDF Document
+				</div>`
+			: `<img src="${url}" alt="${title}"
+				style="width:100%; max-height:180px; object-fit:cover;
+					border-radius: 6px 6px 0 0; display:block;" />`;
+
+		return `
+			<div style="flex:1; border:1px solid var(--border-color);
+				border-radius:8px; overflow:hidden; background:var(--card-bg);">
+				${preview}
+				<div style="padding: 8px 10px; border-top:1px solid var(--border-color);
+					display:flex; justify-content:space-between; align-items:center;
+					font-size:0.82em;">
+					<span style="font-weight:600; color:var(--text-color);">${title}</span>
+					<a href="${url}" target="_blank"
+						style="color:var(--primary); text-decoration:none; white-space:nowrap;">
+						View ↗
+					</a>
+				</div>
+			</div>`;
+	};
+
+	$wrapper.html(`
+		<div style="display:flex; gap:12px; margin-bottom: 4px;">
+			${make_card(front, __("Front / Data Page"))}
+			${make_card(back,  __("Back / Signature Page"))}
+		</div>`);
+}
