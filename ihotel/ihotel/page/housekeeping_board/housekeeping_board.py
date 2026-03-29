@@ -40,7 +40,7 @@ def get_hk_board_data():
 @frappe.whitelist()
 def update_room_status(room, status):
 	"""Update a room's housekeeping status directly from the board."""
-	allowed = ["Available", "Vacant Dirty", "Occupied Dirty", "Vacant Clean", "Occupied Clean", "Dirty", "Pickup", "Inspected", "Housekeeping", "Out of Order", "Out of Service"]
+	allowed = ["Available", "Vacant Dirty", "Occupied Dirty", "Vacant Clean", "Occupied Clean", "Pickup", "Inspected", "Housekeeping", "Out of Order", "Out of Service"]
 	if status not in allowed:
 		frappe.throw(frappe._("Invalid status: {0}").format(status))
 
@@ -57,7 +57,7 @@ def bulk_update_room_status(rooms, status):
 	if isinstance(rooms, str):
 		rooms = json.loads(rooms)
 
-	allowed = ["Available", "Vacant Dirty", "Occupied Dirty", "Vacant Clean", "Occupied Clean", "Dirty", "Pickup", "Inspected", "Housekeeping", "Out of Order", "Out of Service"]
+	allowed = ["Available", "Vacant Dirty", "Occupied Dirty", "Vacant Clean", "Occupied Clean", "Pickup", "Inspected", "Housekeeping", "Out of Order", "Out of Service"]
 	if status not in allowed:
 		frappe.throw(frappe._("Invalid status: {0}").format(status))
 
