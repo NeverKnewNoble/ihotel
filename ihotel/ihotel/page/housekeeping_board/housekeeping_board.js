@@ -22,7 +22,7 @@ frappe.pages["housekeeping-board"].on_page_load = function (wrapper) {
 				</div>
 				<div class="hkb-stat" data-status="Occupied Dirty">
 					<div class="hkb-stat-dot" style="background:#f97316;"></div>
-					<div class="hkb-stat-label">Occ. Dirty</div>
+					<div class="hkb-stat-label">Occupied Dirty</div>
 					<div class="hkb-stat-count" data-key="Occupied Dirty">0</div>
 				</div>
 				<div class="hkb-stat" data-status="Vacant Clean">
@@ -32,13 +32,8 @@ frappe.pages["housekeeping-board"].on_page_load = function (wrapper) {
 				</div>
 				<div class="hkb-stat" data-status="Occupied Clean">
 					<div class="hkb-stat-dot" style="background:#60a5fa;"></div>
-					<div class="hkb-stat-label">Occ. Clean</div>
+					<div class="hkb-stat-label">Occupied Clean</div>
 					<div class="hkb-stat-count" data-key="Occupied Clean">0</div>
-				</div>
-				<div class="hkb-stat" data-status="Dirty">
-					<div class="hkb-stat-dot" style="background:#f97316;"></div>
-					<div class="hkb-stat-label">Dirty</div>
-					<div class="hkb-stat-count" data-key="Dirty">0</div>
 				</div>
 				<div class="hkb-stat" data-status="Pickup">
 					<div class="hkb-stat-dot" style="background:#a855f7;"></div>
@@ -62,12 +57,12 @@ frappe.pages["housekeeping-board"].on_page_load = function (wrapper) {
 				</div>
 				<div class="hkb-stat" data-status="Out of Order">
 					<div class="hkb-stat-dot" style="background:#ef4444;"></div>
-					<div class="hkb-stat-label">OOO</div>
+					<div class="hkb-stat-label">Out of Order</div>
 					<div class="hkb-stat-count" data-key="Out of Order">0</div>
 				</div>
 				<div class="hkb-stat" data-status="Out of Service">
 					<div class="hkb-stat-dot" style="background:#6b7280;"></div>
-					<div class="hkb-stat-label">OOS</div>
+					<div class="hkb-stat-label">Out of Service</div>
 					<div class="hkb-stat-count" data-key="Out of Service">0</div>
 				</div>
 			</div>
@@ -90,7 +85,6 @@ frappe.pages["housekeeping-board"].on_page_load = function (wrapper) {
 							<option>Occupied Dirty</option>
 							<option>Vacant Clean</option>
 							<option>Occupied Clean</option>
-							<option>Dirty</option>
 							<option>Pickup</option>
 							<option>Inspected</option>
 							<option>Housekeeping</option>
@@ -107,16 +101,15 @@ frappe.pages["housekeeping-board"].on_page_load = function (wrapper) {
 						<button class="hkb-pill active" data-status="">All <span class="hkb-pill-count">0</span></button>
 						<button class="hkb-pill" data-status="Available"><span class="hkb-dot" style="background:#10b981;"></span>Available <span class="hkb-pill-count">0</span></button>
 						<button class="hkb-pill" data-status="Vacant Dirty"><span class="hkb-dot" style="background:#fb923c;"></span>Vacant Dirty <span class="hkb-pill-count">0</span></button>
-						<button class="hkb-pill" data-status="Occupied Dirty"><span class="hkb-dot" style="background:#f97316;"></span>Occ. Dirty <span class="hkb-pill-count">0</span></button>
+						<button class="hkb-pill" data-status="Occupied Dirty"><span class="hkb-dot" style="background:#f97316;"></span>Occupied Dirty <span class="hkb-pill-count">0</span></button>
 						<button class="hkb-pill" data-status="Vacant Clean"><span class="hkb-dot" style="background:#34d399;"></span>Vacant Clean <span class="hkb-pill-count">0</span></button>
-						<button class="hkb-pill" data-status="Occupied Clean"><span class="hkb-dot" style="background:#60a5fa;"></span>Occ. Clean <span class="hkb-pill-count">0</span></button>
-						<button class="hkb-pill" data-status="Dirty"><span class="hkb-dot" style="background:#f97316;"></span>Dirty <span class="hkb-pill-count">0</span></button>
+						<button class="hkb-pill" data-status="Occupied Clean"><span class="hkb-dot" style="background:#60a5fa;"></span>Occupied Clean <span class="hkb-pill-count">0</span></button>
 						<button class="hkb-pill" data-status="Pickup"><span class="hkb-dot" style="background:#a855f7;"></span>Pickup <span class="hkb-pill-count">0</span></button>
 						<button class="hkb-pill" data-status="Inspected"><span class="hkb-dot" style="background:#06b6d4;"></span>Inspected <span class="hkb-pill-count">0</span></button>
 						<button class="hkb-pill" data-status="Housekeeping"><span class="hkb-dot" style="background:#f59e0b;"></span>Housekeeping <span class="hkb-pill-count">0</span></button>
 						<button class="hkb-pill" data-status="Occupied"><span class="hkb-dot" style="background:#3b82f6;"></span>Occupied <span class="hkb-pill-count">0</span></button>
-						<button class="hkb-pill" data-status="Out of Order"><span class="hkb-dot" style="background:#ef4444;"></span>OOO <span class="hkb-pill-count">0</span></button>
-						<button class="hkb-pill" data-status="Out of Service"><span class="hkb-dot" style="background:#6b7280;"></span>OOS <span class="hkb-pill-count">0</span></button>
+						<button class="hkb-pill" data-status="Out of Order"><span class="hkb-dot" style="background:#ef4444;"></span>Out of Order <span class="hkb-pill-count">0</span></button>
+						<button class="hkb-pill" data-status="Out of Service"><span class="hkb-dot" style="background:#6b7280;"></span>Out of Service <span class="hkb-pill-count">0</span></button>
 					</div>
 				</div>
 			</div>
@@ -273,7 +266,6 @@ class HKBoard {
 			"Occupied Dirty": "#f97316",
 			"Vacant Clean":   "#34d399",
 			"Occupied Clean": "#60a5fa",
-			"Dirty":          "#f97316",
 			"Pickup":         "#a855f7",
 			"Inspected":      "#06b6d4",
 			"Housekeeping":   "#f59e0b",
@@ -281,7 +273,7 @@ class HKBoard {
 			"Out of Service": "#6b7280",
 		};
 
-		const status_opts = ["Available","Vacant Dirty","Occupied Dirty","Vacant Clean","Occupied Clean","Dirty","Pickup","Inspected","Housekeeping","Out of Order","Out of Service"];
+		const status_opts = ["Available","Vacant Dirty","Occupied Dirty","Vacant Clean","Occupied Clean","Pickup","Inspected","Housekeeping","Out of Order","Out of Service"];
 
 		const cards = rooms.map(room => {
 			const color = colors[room.status] || "#6b7280";

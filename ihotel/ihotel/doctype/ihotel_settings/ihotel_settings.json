@@ -390,10 +390,10 @@
   },
   {
    "default": "0",
-   "description": "When enabled, the system checks Frappe HRMS Shift Assignments before allowing a housekeeper to be assigned. If the housekeeper has no active shift on the assignment date, the selection will be blocked. Disable this if the hotel does not use Frappe HR & Payroll.",
+   "description": "When enabled, the system checks ERPXpand HRMS Shift Assignments before allowing a housekeeper to be assigned. If the housekeeper has no active shift on the assignment date, the selection will be blocked. Disable this if the hotel does not use ERPXpand HR & Payroll.",
    "fieldname": "enforce_roster_check",
    "fieldtype": "Check",
-   "label": "Enforce Roster Check for Housekeepers (Requires Frappe HRMS)"
+   "label": "Enforce Roster Check for Housekeepers (Requires ERPXpand HRMS)"
   },
   {
    "default": "0",
