@@ -82,8 +82,81 @@ def extend_stay(checked_in_name, new_checkout, reason=None):
 
 
 @frappe.whitelist()
+def notify_housekeeping(checked_in_name, service_type):
+	"""
+	Send an in-app (and email) notification to all active housekeepers for a guest service request.
+	service_type: "Do Not Disturb", "Make Up Room", or "Turndown"
+	"""
+	doc = frappe.get_doc("Checked In", checked_in_name)
+
+	MESSAGES = {
+		"Do Not Disturb": _("Room {0} — Guest {1} has set <strong>Do Not Disturb</strong>. Please do not enter the room."),
+		"Make Up Room":   _("Room {0} — Guest {1} has requested <strong>Make Up Room</strong> service."),
+		"Turndown":       _("Room {0} — Guest {1} has requested <strong>Turndown</strong> service."),
+	}
+	message_tmpl = MESSAGES.get(service_type)
+	if not message_tmpl:
+		frappe.throw(_("Unknown service type: {0}").format(service_type))
+
+	subject = _("[iHotel] {0} — Room {1}").format(service_type, doc.room)
+	message = message_tmpl.format(doc.room, doc.guest)
+
+	housekeepers = frappe.get_all(
+		"Housekeeper",
+		filters={"is_active": 1},
+		fields=["employee_name", "user", "email"],
+	)
+
+	for hk in housekeepers:
+		if hk.user:
+			frappe.get_doc({
+				"doctype": "Notification Log",
+				"subject": subject,
+				"email_content": message,
+				"for_user": hk.user,
+				"type": "Alert",
+				"document_type": "Checked In",
+				"document_name": doc.name,
+				"from_user": frappe.session.user,
+			}).insert(ignore_permissions=True)
+			frappe.publish_realtime("notification_bell", {}, user=hk.user)
+
+		target_email = hk.email or (frappe.db.get_value("User", hk.user, "email") if hk.user else None)
+		if target_email:
+			frappe.sendmail(
+				recipients=[target_email],
+				subject=subject,
+				message=message,
+			)
+
+	return True
+
+
+@frappe.whitelist()
+def do_checkout(checked_in_name):
+	"""Set status to Checked Out and stamp actual_check_out, then trigger post-checkout hooks."""
+	doc = frappe.get_doc("Checked In", checked_in_name)
+
+	if doc.status != "Checked In":
+		frappe.throw(_("Only guests with status 'Checked In' can be checked out."))
+
+	doc.db_set("status", "Checked Out", update_modified=True)
+	doc.db_set("actual_check_out", frappe.utils.now_datetime(), update_modified=True)
+
+	# Reload and run post-submit hooks manually (sync room, stats, invoice)
+	doc.reload()
+	doc.on_update_after_submit()
+
+	return True
+
+
+@frappe.whitelist()
 def move_room(checked_in_name, new_room, reason=None):
-	"""Move a checked-in guest to a different room."""
+	"""
+	Move a checked-in guest to a different room.
+	Transfers all stay info, folio room reference, and charge descriptions to the new room.
+	Old room is marked Vacant Dirty for housekeeping.
+	"""
 	checked_in = frappe.get_doc("Checked In", checked_in_name)
 
 	if checked_in.status != "Checked In":
@@ -92,10 +165,11 @@ def move_room(checked_in_name, new_room, reason=None):
 	if checked_in.room == new_room:
 		frappe.throw(_("Guest is already assigned to room {0}.").format(new_room))
 
-	# Confirm the destination room is available
+	# Confirm the destination room is ready
 	new_room_doc = frappe.get_doc("Room", new_room)
-	if new_room_doc.status not in ("Available", "Housekeeping"):
-		frappe.throw(_("Room {0} is not available (current status: {1}).").format(
+	READY = {"Available", "Inspected", "Vacant Clean", "Housekeeping"}
+	if new_room_doc.status not in READY:
+		frappe.throw(_("Room {0} is not available for a room move (current status: {1}).").format(
 			new_room, new_room_doc.status
 		))
 
@@ -111,20 +185,35 @@ def move_room(checked_in_name, new_room, reason=None):
 
 	old_room = checked_in.room
 
-	# Free the old room
-	if old_room:
-		old_room_doc = frappe.get_doc("Room", old_room)
-		old_room_doc.status = "Available"
-		old_room_doc.save(ignore_permissions=True)
+	# ── Update Checked In record ──────────────────────────────────────────────
+	new_room_type = frappe.db.get_value("Room", new_room, "room_type")
+	checked_in.db_set("room", new_room, update_modified=False)
+	if new_room_type:
+		checked_in.db_set("room_type", new_room_type, update_modified=False)
 
-	# Occupy the new room
+	# ── Update folio (iHotel Profile) room reference ──────────────────────────
+	profile_name = checked_in.profile or frappe.db.get_value(
+		"iHotel Profile", {"hotel_stay": checked_in_name}, "name"
+	)
+	if profile_name:
+		profile = frappe.get_doc("iHotel Profile", profile_name)
+		profile.room = new_room
+
+		# Update room reference in existing charge descriptions
+		for charge in profile.charges:
+			if old_room and old_room in (charge.description or ""):
+				charge.description = charge.description.replace(old_room, new_room)
+
+		profile.save(ignore_permissions=True)
+
+	# ── Update room statuses ──────────────────────────────────────────────────
+	if old_room:
+		frappe.db.set_value("Room", old_room, "status", "Vacant Dirty")
+
 	new_room_doc.status = "Occupied"
 	new_room_doc.save(ignore_permissions=True)
 
-	# Update the Check In record
-	checked_in.db_set("room", new_room)
-
-	# Log a comment with the move details
+	# ── Log the move ──────────────────────────────────────────────────────────
 	note = _("Room moved from {0} to {1}.").format(old_room or _("(none)"), new_room)
 	if reason:
 		note += " " + _("Reason: {0}").format(reason)
@@ -137,10 +226,14 @@ def move_room(checked_in_name, new_room, reason=None):
 	}).insert(ignore_permissions=True)
 
 	frappe.msgprint(
-		_("Guest moved from Room {0} to Room {1}.").format(old_room or _("(none)"), new_room),
+		_("Guest moved from Room {0} to Room {1}. All charges and payments have been transferred.").format(
+			old_room or _("(none)"), new_room
+		),
 		indicator="green",
 		alert=True,
 	)
+
+	return True
 
 	return new_room
 
@@ -161,8 +254,8 @@ def get_rooms_for_room_type(doctype, txt, searchfield, start, page_len, filters)
 		conditions.append("room_type = %s")
 		values.append(room_type)
 
-	# Exclude rooms that are permanently unavailable
-	conditions.append("status NOT IN ('Out of Order', 'Out of Service')")
+	# Exclude rooms that are not available
+	conditions.append("status NOT IN ('Out of Order', 'Out of Service', 'Occupied', 'Vacant Dirty', 'Occupied Dirty')")
 
 	where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
@@ -289,16 +382,16 @@ class CheckedIn(Document):
         if not self.room or self.status not in ["Reserved", "Checked In"]:
             return
 
-        # Always block rooms that are permanently out of service
+        # Block rooms that are not available
         room_status = frappe.get_value("Room", self.room, "status")
-        if room_status in ("Out of Order", "Out of Service"):
+        if room_status in ("Out of Order", "Out of Service", "Occupied", "Vacant Dirty", "Occupied Dirty"):
             frappe.throw(
                 _("Room {0} is {1} and cannot be booked.").format(self.room, room_status)
             )
 
         # For immediate check-ins the room must be physically ready
         if self.status == "Checked In":
-            READY_STATUSES = {"Available", "Pickup", "Inspected"}
+            READY_STATUSES = {"Available", "Pickup", "Inspected", "Vacant Clean"}
             if room_status not in READY_STATUSES:
                 frappe.throw(
                     _("Room {0} is not ready for check-in (current status: {1}). "
@@ -418,8 +511,10 @@ class CheckedIn(Document):
         Update room status when hotel stay is submitted.
         Auto-create a folio and post the initial room charge.
         """
-        if self.status == "Reserved":
-            self.mark_room_as_occupied()
+        self.db_set("status", "Checked In", update_modified=False)
+        if not self.actual_check_in:
+            self.db_set("actual_check_in", frappe.utils.now_datetime(), update_modified=False)
+        self.mark_room_as_occupied()
         self._create_folio()
 
     def _create_folio(self):
@@ -608,8 +703,8 @@ class CheckedIn(Document):
 
             if not active_stay_exists:
                 room = frappe.get_doc("Room", self.room)
-                if room.status != "Available":
-                    room.status = "Available"
+                if room.status not in ("Vacant Dirty", "Vacant Clean"):
+                    room.status = "Vacant Dirty"
                     room.save(ignore_permissions=True)
         except Exception as e:
             message = _("Error freeing room status: {0}").format(str(e))

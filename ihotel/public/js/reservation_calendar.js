@@ -7,6 +7,9 @@ frappe.views.calendar["Reservation"] = {
 		"color": "color",
 		"allDay": 1,
 	},
+	options: {
+		initialDate: frappe.datetime.get_today(),
+	},
 	filters: [
 		{
 			"fieldtype": "Select",

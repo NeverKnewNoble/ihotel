@@ -51,3 +51,85 @@ class iHotelProfile(Document):
 			"reference_name": reference_name or "",
 		})
 		self.save(ignore_permissions=True)
+
+
+@frappe.whitelist()
+def transfer_folio(source_profile_name, target_profile_name):
+	"""
+	Transfer all charges and payments from source folio to target folio.
+	Source folio is marked Transferred. Target folio absorbs all line items.
+	"""
+	from frappe import _
+
+	if source_profile_name == target_profile_name:
+		frappe.throw(_("Cannot transfer a folio to itself."))
+
+	source = frappe.get_doc("iHotel Profile", source_profile_name)
+	target = frappe.get_doc("iHotel Profile", target_profile_name)
+
+	if source.status != "Open":
+		frappe.throw(_("Only Open folios can be transferred."))
+	if target.status not in ("Open",):
+		frappe.throw(_("Target folio must be Open."))
+
+	source_label = _("Room {0}").format(source.room or source_profile_name)
+
+	# Copy charges
+	for charge in source.get("charges", []):
+		target.append("charges", {
+			"charge_date": charge.charge_date,
+			"charge_type": charge.charge_type,
+			"description": _("{0} [Transferred from {1}]").format(
+				charge.description or "", source_label
+			),
+			"quantity": charge.quantity,
+			"rate": charge.rate,
+			"amount": charge.amount,
+			"reference_doctype": charge.reference_doctype,
+			"reference_name": charge.reference_name,
+		})
+
+	# Copy payments
+	for payment in source.get("payments", []):
+		target.append("payments", {
+			"date": payment.date,
+			"payment_method": payment.payment_method,
+			"rate": payment.rate,
+			"detail": _("{0} [Transferred from {1}]").format(
+				payment.detail or "", source_label
+			),
+			"payment_status": payment.payment_status,
+		})
+
+	target.save(ignore_permissions=True)
+
+	# Mark source as Transferred
+	source.status = "Transferred"
+	source.notes = (_("Transferred to {0} ({1}) on {2}.").format(
+		target_profile_name, target.room or "", nowdate()
+	))
+	source.save(ignore_permissions=True)
+
+	# Log on source
+	frappe.get_doc({
+		"doctype": "Comment",
+		"comment_type": "Info",
+		"reference_doctype": "iHotel Profile",
+		"reference_name": source_profile_name,
+		"content": _("All charges and payments transferred to folio {0} (Room {1}).").format(
+			target_profile_name, target.room or ""
+		),
+	}).insert(ignore_permissions=True)
+
+	# Log on target
+	frappe.get_doc({
+		"doctype": "Comment",
+		"comment_type": "Info",
+		"reference_doctype": "iHotel Profile",
+		"reference_name": target_profile_name,
+		"content": _("Charges and payments received from folio {0} ({1}).").format(
+			source_profile_name, source_label
+		),
+	}).insert(ignore_permissions=True)
+
+	return True

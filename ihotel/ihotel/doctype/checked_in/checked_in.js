@@ -9,6 +9,21 @@ frappe.ui.form.on("Checked In", {
 	refresh(frm) {
 		setup_room_query(frm);
 
+		// Status indicator badge
+		const STATUS_COLORS = {
+			"Reserved":    "orange",
+			"Checked In":  "blue",
+			"Checked Out": "green",
+			"No Show":     "grey",
+			"Cancelled":   "red",
+		};
+		if (frm.doc.status) {
+			frm.page.set_indicator(
+				__(frm.doc.status),
+				STATUS_COLORS[frm.doc.status] || "grey"
+			);
+		}
+
 		// Restrict date pickers to today or later unless allow_past_dates is enabled
 		if (frm.is_new()) {
 			frappe.db.get_single_value("iHotel Settings", "allow_past_dates").then(allow => {
@@ -43,7 +58,7 @@ frappe.ui.form.on("Checked In", {
 		}
 
 		// Status-based action buttons
-		if (frm.doc.status === "Reserved" && !frm.is_new()) {
+		if (frm.doc.status === "Reserved" && !frm.is_new() && frm.doc.docstatus !== 1) {
 			frm.add_custom_button(__("Checked In"), function() {
 				frm.set_value("status", "Checked In");
 				frm.set_value("actual_check_in", frappe.datetime.now_datetime());
@@ -65,33 +80,63 @@ frappe.ui.form.on("Checked In", {
 			frm.add_custom_button(
 				frm.doc.do_not_disturb ? __("Clear DND") : __("Set DND"),
 				function() {
-					frm.set_value("do_not_disturb", frm.doc.do_not_disturb ? 0 : 1);
-					frm.save();
+					const turning_on = !frm.doc.do_not_disturb;
+					frm.set_value("do_not_disturb", turning_on ? 1 : 0);
+					frm.save().then(() => {
+						if (turning_on) {
+							frappe.call({
+								method: "ihotel.ihotel.doctype.checked_in.checked_in.notify_housekeeping",
+								args: { checked_in_name: frm.doc.name, service_type: "Do Not Disturb" },
+							});
+						}
+					});
 				}, __("Guest Services")
 			);
 
 			frm.add_custom_button(
 				frm.doc.make_up_room ? __("Clear Make Up Room") : __("Make Up Room"),
 				function() {
-					frm.set_value("make_up_room", frm.doc.make_up_room ? 0 : 1);
-					frm.save();
+					const turning_on = !frm.doc.make_up_room;
+					frm.set_value("make_up_room", turning_on ? 1 : 0);
+					frm.save().then(() => {
+						if (turning_on) {
+							frappe.call({
+								method: "ihotel.ihotel.doctype.checked_in.checked_in.notify_housekeeping",
+								args: { checked_in_name: frm.doc.name, service_type: "Make Up Room" },
+							});
+						}
+					});
 				}, __("Guest Services")
 			);
 
 			frm.add_custom_button(
 				frm.doc.turndown_requested ? __("Cancel Turndown") : __("Request Turndown"),
 				function() {
-					frm.set_value("turndown_requested", frm.doc.turndown_requested ? 0 : 1);
-					frm.save();
+					const turning_on = !frm.doc.turndown_requested;
+					frm.set_value("turndown_requested", turning_on ? 1 : 0);
+					frm.save().then(() => {
+						if (turning_on) {
+							frappe.call({
+								method: "ihotel.ihotel.doctype.checked_in.checked_in.notify_housekeeping",
+								args: { checked_in_name: frm.doc.name, service_type: "Turndown" },
+							});
+						}
+					});
 				}, __("Guest Services")
 			);
 
 
 			frm.add_custom_button(__("Check Out"), function() {
 				const do_checkout = () => {
-					frm.set_value("status", "Checked Out");
-					frm.set_value("actual_check_out", frappe.datetime.now_datetime());
-					frm.save();
+					frappe.call({
+						method: "ihotel.ihotel.doctype.checked_in.checked_in.do_checkout",
+						args: { checked_in_name: frm.doc.name },
+						callback(r) {
+							if (r.message) {
+								frm.reload_doc();
+							}
+						},
+					});
 				};
 				// Always fetch profile from DB — frm.doc.profile may be stale
 				// if the folio was created after the form was last loaded
@@ -179,7 +224,11 @@ frappe.ui.form.on("Checked In", {
 							options: "Room",
 							reqd: 1,
 							get_query: function () {
-								return { filters: { status: "Available" } };
+								return {
+									filters: {
+										status: ["in", ["Available", "Inspected", "Vacant Clean"]],
+									},
+								};
 							},
 						},
 						{
@@ -384,7 +433,9 @@ function setup_room_query(frm) {
 				filters: { room_type: frm.doc.room_type },
 			};
 		}
-		return {};
+		return {
+			filters: { status: ["not in", ["Occupied", "Vacant Dirty", "Occupied Dirty", "Out of Order", "Out of Service"]] },
+		};
 	});
 }
 

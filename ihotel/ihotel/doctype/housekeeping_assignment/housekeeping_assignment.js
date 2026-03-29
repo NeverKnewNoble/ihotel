@@ -2,6 +2,37 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Housekeeping Assignment", {
+	housekeeper(frm) {
+		if (!frm.doc.housekeeper || !frm.doc.date) return;
+
+		frappe.call({
+			method: "ihotel.ihotel.doctype.housekeeping_assignment.housekeeping_assignment.check_housekeeper_roster",
+			args: {
+				housekeeper: frm.doc.housekeeper,
+				date: frm.doc.date,
+			},
+			callback(r) {
+				if (!r.message) return;
+				const { checked, on_roster } = r.message;
+				if (checked && !on_roster) {
+					frappe.msgprint({
+						title: __("Not On Roster"),
+						message: __("{0} does not have an active shift assignment on {1} and cannot be assigned.", [frm.doc.housekeeper, frm.doc.date]),
+						indicator: "red",
+					});
+					frm.set_value("housekeeper", "");
+				}
+			},
+		});
+	},
+
+	date(frm) {
+		// Re-validate roster if housekeeper already selected and date changes
+		if (frm.doc.housekeeper) {
+			frm.trigger("housekeeper");
+		}
+	},
+
 	refresh(frm) {
 		// Load Dirty Rooms button — always visible on unsaved/saved forms
 		frm.add_custom_button(__("Load Dirty Rooms"), function () {

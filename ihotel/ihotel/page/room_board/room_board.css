@@ -200,6 +200,10 @@
 .rb-pill.active[data-status=""]               { background: #374151; }
 .rb-pill.active[data-status="Available"]      { background: #10b981; }
 .rb-pill.active[data-status="Occupied"]       { background: #3b82f6; }
+.rb-pill.active[data-status="Vacant Dirty"]   { background: #fb923c; }
+.rb-pill.active[data-status="Occupied Dirty"] { background: #f97316; }
+.rb-pill.active[data-status="Vacant Clean"]   { background: #34d399; }
+.rb-pill.active[data-status="Occupied Clean"] { background: #60a5fa; }
 .rb-pill.active[data-status="Dirty"]          { background: #f97316; }
 .rb-pill.active[data-status="Pickup"]         { background: #a855f7; }
 .rb-pill.active[data-status="Inspected"]      { background: #06b6d4; }
@@ -303,6 +307,32 @@
 	font-size: 11px;
 	color: var(--text-muted);
 	margin-top: 2px;
+}
+
+/* ── DND / MUR badges on card ── */
+.rb-badges {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-top: 6px;
+}
+
+.rb-badge {
+	font-size: 10px;
+	font-weight: 700;
+	padding: 2px 6px;
+	border-radius: 4px;
+	letter-spacing: 0.04em;
+}
+
+.rb-badge-dnd {
+	background: #fee2e2;
+	color: #dc2626;
+}
+
+.rb-badge-mur {
+	background: #dcfce7;
+	color: #16a34a;
 }
 
 /* ── Check In button on card ── */

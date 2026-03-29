@@ -32,6 +32,46 @@ class HousekeepingAssignment(Document):
 
 
 @frappe.whitelist()
+def check_housekeeper_roster(housekeeper, date):
+	"""
+	Returns {"on_roster": true/false, "checked": true/false}.
+	- checked=False means the setting is off or HRMS is not installed — caller should allow freely.
+	- checked=True means HRMS is installed and the setting is on — on_roster indicates the result.
+	"""
+	enforce = frappe.db.get_single_value("iHotel Settings", "enforce_roster_check")
+	if not enforce:
+		return {"checked": False, "on_roster": True}
+
+	if not frappe.db.table_exists("Shift Assignment"):
+		# HRMS not installed — fail open so existing workflows aren't blocked
+		return {"checked": False, "on_roster": True}
+
+	hk = frappe.get_doc("Housekeeper", housekeeper)
+	if not hk.employee:
+		frappe.throw(_("Housekeeper {0} is not linked to an Employee record.").format(housekeeper))
+
+	on_roster = frappe.db.exists("Shift Assignment", {
+		"employee": hk.employee,
+		"start_date": ["<=", date],
+		"end_date": [">=", date],
+		"status": "Active",
+		"docstatus": 1,
+	})
+
+	# Also accept open-ended shifts (no end_date set)
+	if not on_roster:
+		on_roster = frappe.db.exists("Shift Assignment", {
+			"employee": hk.employee,
+			"start_date": ["<=", date],
+			"end_date": ["is", "not set"],
+			"status": "Active",
+			"docstatus": 1,
+		})
+
+	return {"checked": True, "on_roster": bool(on_roster)}
+
+
+@frappe.whitelist()
 def get_dirty_rooms():
 	"""Return all rooms currently with status Dirty."""
 	rooms = frappe.get_all(

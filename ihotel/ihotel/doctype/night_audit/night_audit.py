@@ -9,7 +9,7 @@ import frappe
 from frappe.model.document import Document
 from frappe import _
 from datetime import datetime, date
-from frappe.utils import nowdate
+from frappe.utils import getdate
 
 class NightAudit(Document):
     def validate(self):
@@ -21,43 +21,37 @@ class NightAudit(Document):
 
     def calculate_audit_metrics(self):
         """
-        Calculate night audit metrics automatically:
+        Calculate night audit metrics for the audit date:
         - Total rooms from iHotel Settings
-        - Occupied rooms from checked-in stays
+        - Occupied rooms: guests in-house on the audit date
         - Occupancy rate (occupied / total * 100)
-        - Total revenue from checked-in stays
+        - Total revenue from in-house stays
         """
-        # Get total rooms from iHotel Settings
         try:
             settings = frappe.get_single("iHotel Settings")
             self.total_rooms = settings.total_rooms or 0
         except Exception:
             frappe.throw(_("Please configure Total Rooms in iHotel Settings"))
 
-        # Get occupied rooms - count of checked-in stays
-        # Status "Checked In" means the guest has checked in
-        occupied_stays = frappe.get_all("Checked In",
-            filters={
-                "status": "Checked In",
-                "docstatus": 1
-            },
-            fields=["name", "room_rate", "total_amount"])
+        audit_date = self.audit_date
+        occupied_stays = frappe.db.sql("""
+            SELECT name, room_rate
+            FROM `tabChecked In`
+            WHERE status = 'Checked In'
+            AND docstatus = 1
+            AND DATE(expected_check_in) <= %(date)s
+            AND DATE(expected_check_out) > %(date)s
+        """, {"date": audit_date}, as_dict=True)
 
         self.occupied_rooms = len(occupied_stays)
 
-        # Calculate occupancy rate
         if self.total_rooms and self.total_rooms > 0:
             self.occupancy_rate = (self.occupied_rooms / self.total_rooms) * 100
         else:
             self.occupancy_rate = 0
 
-        # Revenue = sum of nightly room rates (one night per in-house stay)
         self.total_revenue = sum(stay.room_rate or 0 for stay in occupied_stays)
-
-        # ADR = revenue / occupied rooms
         self.adr = round(self.total_revenue / self.occupied_rooms, 2) if self.occupied_rooms else 0
-
-        # RevPAR = revenue / total available rooms
         self.revpar = round(self.total_revenue / self.total_rooms, 2) if self.total_rooms else 0
 
     def validate_audit_date(self):
@@ -85,23 +79,27 @@ class NightAudit(Document):
 
     def run_night_audit(self):
         """
-        Post room charges for all occupied rooms.
-        Only processes checked-in stays that are submitted.
+        Post one nightly room charge per guest who is in-house on the audit date.
+        A guest is in-house if: check_in <= audit_date < check_out.
+        The charge is posted with the audit date, not the current date.
         """
-        occupied_stays = frappe.get_all(
-            "Checked In",
-            filters={
-                "status": "Checked In",  # Match the status in JSON
-                "docstatus": 1
-            },
-            fields=["name"]
-        )
+        audit_date = self.audit_date
 
-        for stay in occupied_stays:
+        in_house_stays = frappe.db.sql("""
+            SELECT name FROM `tabChecked In`
+            WHERE status = 'Checked In'
+            AND docstatus = 1
+            AND DATE(expected_check_in) <= %(date)s
+            AND DATE(expected_check_out) > %(date)s
+        """, {"date": audit_date}, as_dict=True)
+
+        for stay in in_house_stays:
             stay_doc = frappe.get_doc("Checked In", stay.name)
             profile_doc = self.ensure_profile_for_stay(stay_doc)
             self.add_payment_entry(profile_doc, stay_doc)
-            # self.create_journal_entry(stay_doc)
+            # Mark room as Occupied Dirty for housekeeping
+            if stay_doc.room:
+                frappe.db.set_value("Room", stay_doc.room, "status", "Occupied Dirty")
 
     def ensure_profile_for_stay(self, stay_doc):
         """
@@ -134,14 +132,14 @@ class NightAudit(Document):
 
     def add_payment_entry(self, profile_doc, stay_doc):
         """
-        Append a nightly room charge to the folio charges table.
-        Skips if a room charge for today already exists (prevents duplicates).
+        Append a nightly room charge to the folio using the audit date.
+        Skips if a room charge for this audit date already exists (prevents duplicates on re-run).
         """
-        today = nowdate()
+        audit_date = self.audit_date
 
         # Duplicate guard: don't post twice for the same audit date
         already_posted = any(
-            r.charge_date == today
+            str(r.charge_date) == str(audit_date)
             and r.charge_type == "Room Charge"
             and r.reference_name == stay_doc.name
             for r in profile_doc.get("charges", [])
@@ -150,9 +148,11 @@ class NightAudit(Document):
             return
 
         profile_doc.append("charges", {
-            "charge_date": today,
+            "charge_date": audit_date,
             "charge_type": "Room Charge",
-            "description": "Nightly room charge — Room {0}".format(stay_doc.room or ""),
+            "description": _("Nightly room charge — Room {0} ({1})").format(
+                stay_doc.room or "", audit_date
+            ),
             "quantity": 1,
             "rate": stay_doc.room_rate or 0,
             "amount": stay_doc.room_rate or 0,
@@ -215,6 +215,53 @@ class NightAudit(Document):
     #     except Exception as e:
     #         frappe.log_error(f"Error creating journal entry for Hotel Stay {stay_doc.name}: {str(e)}")
     #         frappe.throw(_("Error creating journal entry: {0}").format(str(e)))
+
+    @frappe.whitelist()
+    def get_trial_balance(self):
+        """
+        Build a Trial Balance for the audit date.
+        Returns revenue grouped by charge type and payments grouped by payment method.
+        """
+        audit_date = self.audit_date
+
+        revenue_rows = frappe.db.sql("""
+            SELECT
+                fc.charge_type,
+                SUM(fc.amount) AS total
+            FROM `tabFolio Charge` fc
+            INNER JOIN `tabiHotel Profile` p ON p.name = fc.parent
+            WHERE DATE(fc.charge_date) = %(date)s
+            AND p.status != 'Transferred'
+            GROUP BY fc.charge_type
+            ORDER BY fc.charge_type
+        """, {"date": audit_date}, as_dict=True)
+
+        payment_rows = frappe.db.sql("""
+            SELECT
+                pi.payment_method,
+                SUM(pi.rate) AS total
+            FROM `tabPayment Items` pi
+            INNER JOIN `tabiHotel Profile` p ON p.name = pi.parent
+            WHERE DATE(pi.date) = %(date)s
+            AND p.status != 'Transferred'
+            GROUP BY pi.payment_method
+            ORDER BY pi.payment_method
+        """, {"date": audit_date}, as_dict=True)
+
+        total_revenue  = sum(r.total or 0 for r in revenue_rows)
+        total_payments = sum(r.total or 0 for r in payment_rows)
+
+        return {
+            "audit_date":     str(audit_date),
+            "revenue":        revenue_rows,
+            "payments":       payment_rows,
+            "total_revenue":  total_revenue,
+            "total_payments": total_payments,
+            "net_balance":    round(total_revenue - total_payments, 2),
+            "occupied_rooms": self.occupied_rooms or 0,
+            "total_rooms":    self.total_rooms or 0,
+            "occupancy_rate": self.occupancy_rate or 0,
+        }
 
     @frappe.whitelist()
     def calculate_metrics(self):

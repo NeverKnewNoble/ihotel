@@ -7,6 +7,9 @@ frappe.views.calendar["Checked In"] = {
 		"color": "color",
 		"allDay": 0,
 	},
+	options: {
+		initialDate: frappe.datetime.get_today(),
+	},
 	filters: [
 		{
 			"fieldtype": "Select",

@@ -28,6 +28,8 @@ def get_room_board_data():
 		room["guest"] = None
 		room["stay"] = None
 		room["check_out"] = None
+		room["do_not_disturb"] = 0
+		room["make_up_room"] = 0
 		room["rack_rate"] = rack_rates.get(room["room_type"], 0)
 
 		if room["status"] in ("Occupied", "Reserved"):
@@ -38,13 +40,15 @@ def get_room_board_data():
 					"status": ["in", ["Reserved", "Checked In"]],
 					"docstatus": 1,
 				},
-				fieldname=["name", "guest", "expected_check_out"],
+				fieldname=["name", "guest", "expected_check_out", "do_not_disturb", "make_up_room"],
 				as_dict=True,
 			)
 			if stay:
 				room["stay"] = stay.name
 				room["guest"] = stay.guest
 				room["check_out"] = stay.expected_check_out
+				room["do_not_disturb"] = stay.do_not_disturb
+				room["make_up_room"] = stay.make_up_room
 
 	return rooms
 

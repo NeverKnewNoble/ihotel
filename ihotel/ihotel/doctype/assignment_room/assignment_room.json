@@ -46,7 +46,16 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "Pending\nIn Progress\nCompleted"
+   "options": "Pending\nIn Progress\nCompleted\nNot Cleaned"
+  },
+  {
+   "columns": 3,
+   "depends_on": "eval:doc.task_status === 'Not Cleaned'",
+   "fieldname": "non_cleaning_reason",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Reason Not Cleaned",
+   "options": "\nDo Not Disturb\nGuest Refused\nRoom Locked\nGuest Sleeping\nOther"
   },
   {
    "fieldname": "notes",
