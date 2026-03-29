@@ -49,6 +49,59 @@ frappe.ui.form.on("iHotel Profile", {
 				frm.save();
 			}).addClass("btn-primary");
 		}
+
+		// Transfer to Profile button — move all charges & payments to another folio
+		if (frm.doc.status === "Open") {
+			frm.add_custom_button(__("Transfer to Profile"), function () {
+				const d = new frappe.ui.Dialog({
+					title: __("Transfer Folio to Another Room"),
+					fields: [
+						{
+							fieldtype: "HTML",
+							options: `<p class="text-muted small">All charges and payments on this folio will be moved to the selected profile. This folio will be marked <b>Transferred</b>.</p>`,
+						},
+						{
+							fieldtype: "Link",
+							fieldname: "target_profile",
+							label: __("Transfer To (Profile / Room)"),
+							options: "iHotel Profile",
+							reqd: 1,
+							get_query: function () {
+								return {
+									filters: {
+										status: "Open",
+										name: ["!=", frm.doc.name],
+									},
+								};
+							},
+						},
+					],
+					primary_action_label: __("Confirm Transfer"),
+					primary_action(values) {
+						frappe.confirm(
+							__("Transfer all charges and payments from this folio to {0}? This cannot be undone.", [values.target_profile]),
+							function () {
+								frappe.call({
+									method: "ihotel.ihotel.doctype.ihotel_profile.ihotel_profile.transfer_folio",
+									args: {
+										source_profile_name: frm.doc.name,
+										target_profile_name: values.target_profile,
+									},
+									callback(r) {
+										if (r.message) {
+											d.hide();
+											frappe.show_alert({ message: __("Folio transferred successfully."), indicator: "green" });
+											frm.reload_doc();
+										}
+									},
+								});
+							}
+						);
+					},
+				});
+				d.show();
+			}, __("Actions"));
+		}
 	},
 });
 

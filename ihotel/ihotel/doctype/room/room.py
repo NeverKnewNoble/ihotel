@@ -48,8 +48,8 @@ class Room(Document):
 
             if current_stay:
                 # Room has an active reservation, mark as occupied
-                if self.status not in ["Occupied", "Out of Order"]:
+                if self.status not in ["Occupied", "Occupied Dirty", "Occupied Clean", "Out of Order"]:
                     self.status = "Occupied"
             elif self.status == "Occupied":
-                # No active reservation but marked as occupied, make available
-                self.status = "Available"
+                # No active reservation but marked as occupied — reset to Vacant Dirty for housekeeping
+                self.status = "Vacant Dirty"

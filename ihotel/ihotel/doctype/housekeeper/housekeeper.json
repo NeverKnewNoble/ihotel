@@ -1,11 +1,13 @@
 {
  "actions": [],
- "autoname": "field:employee_name",
+ "autoname": "field:employee",
  "creation": "2026-03-27 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "employee",
   "employee_name",
+  "department",
   "column_break_hk1",
   "phone",
   "email",
@@ -15,12 +17,29 @@
  ],
  "fields": [
   {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Employee",
+   "options": "Employee",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fetch_from": "employee.employee_name",
    "fieldname": "employee_name",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Employee Name",
-   "reqd": 1,
-   "unique": 1
+   "read_only": 1
+  },
+  {
+   "fetch_from": "employee.department",
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "label": "Department",
+   "options": "Department",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_hk1",
@@ -59,7 +78,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-27 14:13:41.047626",
+ "modified": "2026-03-29 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Housekeeper",

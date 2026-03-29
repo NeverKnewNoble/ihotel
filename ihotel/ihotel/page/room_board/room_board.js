@@ -73,6 +73,22 @@ frappe.pages["room_board"].on_page_load = function (wrapper) {
 							<span class="rb-dot" style="background:#3b82f6;"></span>
 							Occupied <span class="rb-pill-count">0</span>
 						</button>
+						<button class="rb-pill" data-status="Vacant Dirty">
+							<span class="rb-dot" style="background:#fb923c;"></span>
+							Vacant Dirty <span class="rb-pill-count">0</span>
+						</button>
+						<button class="rb-pill" data-status="Occupied Dirty">
+							<span class="rb-dot" style="background:#f97316;"></span>
+							Occ. Dirty <span class="rb-pill-count">0</span>
+						</button>
+						<button class="rb-pill" data-status="Vacant Clean">
+							<span class="rb-dot" style="background:#34d399;"></span>
+							Vacant Clean <span class="rb-pill-count">0</span>
+						</button>
+						<button class="rb-pill" data-status="Occupied Clean">
+							<span class="rb-dot" style="background:#60a5fa;"></span>
+							Occ. Clean <span class="rb-pill-count">0</span>
+						</button>
 						<button class="rb-pill" data-status="Dirty">
 							<span class="rb-dot" style="background:#f97316;"></span>
 							Dirty <span class="rb-pill-count">0</span>
@@ -114,7 +130,11 @@ frappe.pages["room_board"].on_page_load = function (wrapper) {
 				<div class="rb-legend-grid">
 					<div class="rb-legend-item"><span class="rb-dot" style="background:#10b981;"></span><span><b>Available</b> — Clean &amp; ready for check-in</span></div>
 					<div class="rb-legend-item"><span class="rb-dot" style="background:#3b82f6;"></span><span><b>Occupied</b> — Guest currently in room</span></div>
-					<div class="rb-legend-item"><span class="rb-dot" style="background:#f97316;"></span><span><b>Dirty</b> — Checked out, awaiting housekeeping</span></div>
+					<div class="rb-legend-item"><span class="rb-dot" style="background:#fb923c;"></span><span><b>Vacant Dirty</b> — Checked out, awaiting cleaning</span></div>
+					<div class="rb-legend-item"><span class="rb-dot" style="background:#f97316;"></span><span><b>Occupied Dirty</b> — Occupied, needs overnight cleaning</span></div>
+					<div class="rb-legend-item"><span class="rb-dot" style="background:#34d399;"></span><span><b>Vacant Clean</b> — Cleaned, pending inspection</span></div>
+					<div class="rb-legend-item"><span class="rb-dot" style="background:#60a5fa;"></span><span><b>Occupied Clean</b> — Occupied and cleaned</span></div>
+					<div class="rb-legend-item"><span class="rb-dot" style="background:#f97316;"></span><span><b>Dirty</b> — Needs cleaning</span></div>
 					<div class="rb-legend-item"><span class="rb-dot" style="background:#a855f7;"></span><span><b>Pickup</b> — Cleaning in progress</span></div>
 					<div class="rb-legend-item"><span class="rb-dot" style="background:#06b6d4;"></span><span><b>Inspected</b> — Cleaned &amp; inspector-approved</span></div>
 					<div class="rb-legend-item"><span class="rb-dot" style="background:#f59e0b;"></span><span><b>Housekeeping</b> — Scheduled maintenance clean</span></div>
@@ -136,7 +156,7 @@ frappe.pages["room_board"].on_page_show = function (wrapper) {
 };
 
 // Statuses where a room is ready to accept a walk-in
-const CHECK_IN_READY = new Set(["Available", "Inspected", "Pickup"]);
+const CHECK_IN_READY = new Set(["Available", "Inspected", "Pickup", "Vacant Clean"]);
 
 class RoomBoard {
 	constructor(page) {
@@ -278,6 +298,10 @@ class RoomBoard {
 		const status_colors = {
 			"Available":      "#10b981",
 			"Occupied":       "#3b82f6",
+			"Vacant Dirty":   "#fb923c",
+			"Occupied Dirty": "#f97316",
+			"Vacant Clean":   "#34d399",
+			"Occupied Clean": "#60a5fa",
 			"Dirty":          "#f97316",
 			"Pickup":         "#a855f7",
 			"Inspected":      "#06b6d4",
@@ -310,6 +334,12 @@ class RoomBoard {
 					</button>`
 				: "";
 
+			const badges = [
+				room.do_not_disturb ? `<span class="rb-badge rb-badge-dnd">DND</span>` : "",
+				room.make_up_room   ? `<span class="rb-badge rb-badge-mur">MUR</span>` : "",
+			].filter(Boolean).join("");
+			const badges_html = badges ? `<div class="rb-badges">${badges}</div>` : "";
+
 			return `
 				<div class="rb-card" data-href="${href}"
 					style="--rb-status-color:${color}; cursor:pointer;">
@@ -322,6 +352,7 @@ class RoomBoard {
 					<div class="rb-status-label" style="color:${color};">${frappe.utils.escape_html(room.status)}</div>
 					${guest_html}
 					${checkout_html}
+					${badges_html}
 					${checkin_btn}
 				</div>`;
 		}).join("");

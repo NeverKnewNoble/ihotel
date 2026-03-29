@@ -83,7 +83,9 @@
   "policies_tab",
   "cancellation_policy",
   "column_break_pol2",
-  "privacy_policy"
+  "privacy_policy",
+  "hr_integration_tab",
+  "enforce_roster_check"
  ],
  "fields": [
   {
@@ -380,6 +382,18 @@
    "fieldname": "privacy_policy",
    "fieldtype": "Text Editor",
    "label": "Privacy Policy"
+  },
+  {
+   "fieldname": "hr_integration_tab",
+   "fieldtype": "Tab Break",
+   "label": "HR Integration"
+  },
+  {
+   "default": "0",
+   "description": "When enabled, the system checks Frappe HRMS Shift Assignments before allowing a housekeeper to be assigned. If the housekeeper has no active shift on the assignment date, the selection will be blocked. Disable this if the hotel does not use Frappe HR & Payroll.",
+   "fieldname": "enforce_roster_check",
+   "fieldtype": "Check",
+   "label": "Enforce Roster Check for Housekeepers (Requires Frappe HRMS)"
   },
   {
    "default": "0",

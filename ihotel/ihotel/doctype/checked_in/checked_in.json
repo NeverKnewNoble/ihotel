@@ -220,7 +220,7 @@
    "default": "0",
    "fieldname": "make_up_room",
    "fieldtype": "Check",
-   "label": "Make Up Room"
+   "label": "Make My Room"
   },
   {
    "fieldname": "column_break_gsvc",
@@ -341,7 +341,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-25 22:33:44.861355",
+ "modified": "2026-03-28 20:53:30.483971",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Checked In",
