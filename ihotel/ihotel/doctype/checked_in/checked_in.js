@@ -1,6 +1,13 @@
 // Copyright (c) 2025, Noble and contributors
 // For license information, please see license.txt
 
+const ADULTS_RATE_COLUMN_MAP = {
+	1: "Single / Base Rate",
+	2: "Double Rate",
+	3: "Triple Rate",
+	4: "Quad Rate",
+};
+
 frappe.ui.form.on("Checked In", {
 	onload(frm) {
 		setup_room_query(frm);
@@ -8,6 +15,7 @@ frappe.ui.form.on("Checked In", {
 
 	refresh(frm) {
 		setup_room_query(frm);
+		ci_set_rate_line_room_type_default(frm);
 
 		// Status indicator badge
 		const STATUS_COLORS = {
@@ -284,6 +292,31 @@ frappe.ui.form.on("Checked In", {
 		} else if (!frm.doc.room_type) {
 			frm.set_value("room", "");
 		}
+
+		// Auto-insert one row if the table is empty and a room_type is now selected
+		if (frm.doc.room_type && (!frm.doc.rate_lines || frm.doc.rate_lines.length === 0)) {
+			const row = frm.add_child("rate_lines");
+			frappe.model.set_value("Stay Rate Line", row.name, "room_type", frm.doc.room_type);
+			const auto_col = ADULTS_RATE_COLUMN_MAP[frm.doc.adults];
+			if (auto_col) frappe.model.set_value("Stay Rate Line", row.name, "rate_column", auto_col);
+			frm.refresh_field("rate_lines");
+		}
+
+		// Set default so every new rate_lines row picks up this room_type automatically
+		ci_set_rate_line_room_type_default(frm);
+
+		// Also sync any already-existing rows
+		(frm.doc.rate_lines || []).forEach(row => {
+			frappe.model.set_value("Stay Rate Line", row.name, "room_type", frm.doc.room_type || "");
+		});
+	},
+
+	adults(frm) {
+		const rate_column = ADULTS_RATE_COLUMN_MAP[frm.doc.adults];
+		if (!rate_column) return;
+		(frm.doc.rate_lines || []).forEach(row => {
+			frappe.model.set_value("Stay Rate Line", row.name, "rate_column", rate_column);
+		});
 	},
 
 	expected_check_in(frm)  { frm.trigger("calculate_total"); },
@@ -424,6 +457,13 @@ frappe.ui.form.on("Stay Rate Line", {
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+function ci_set_rate_line_room_type_default(frm) {
+	const grid = frm.fields_dict.rate_lines && frm.fields_dict.rate_lines.grid;
+	if (!grid) return;
+	const df = (grid.docfields || []).find(f => f.fieldname === "room_type");
+	if (df) df.default = frm.doc.room_type || "";
+}
 
 function setup_room_query(frm) {
 	frm.set_query("room", function() {

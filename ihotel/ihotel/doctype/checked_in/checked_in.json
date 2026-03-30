@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:guest",
+ "autoname": "CI-.YYYY.-.#####",
  "creation": "2025-11-13 23:02:20.996524",
  "default_view": "Calendar",
  "doctype": "DocType",
@@ -62,8 +62,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Guest",
-   "options": "Guest",
-   "unique": 1
+   "options": "Guest"
   },
   {
    "fieldname": "section_break_uvsf",
@@ -345,7 +344,7 @@
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Checked In",
- "naming_rule": "By fieldname",
+ "naming_rule": "Expression (using Naming Series)",
  "owner": "Administrator",
  "permissions": [
   {

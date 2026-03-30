@@ -7,6 +7,13 @@ const STATUS_COLORS = {
 	cancelled: "red",
 };
 
+const ADULTS_RATE_COLUMN_MAP = {
+	1: "Single / Base Rate",
+	2: "Double Rate",
+	3: "Triple Rate",
+	4: "Quad Rate",
+};
+
 frappe.ui.form.on("Reservation", {
 	refresh(frm) {
 		// Status indicator in form header
@@ -164,6 +171,7 @@ frappe.ui.form.on("Reservation", {
 		}
 
 		apply_direct_bill_rule(frm);
+		set_rate_line_room_type_default(frm);
 	},
 
 	payment_method(frm) {
@@ -192,6 +200,31 @@ frappe.ui.form.on("Reservation", {
 				}
 			});
 		}
+
+		// Auto-insert one row if the table is empty and a room_type is now selected
+		if (frm.doc.room_type && (!frm.doc.rate_lines || frm.doc.rate_lines.length === 0)) {
+			const row = frm.add_child("rate_lines");
+			frappe.model.set_value("Stay Rate Line", row.name, "room_type", frm.doc.room_type);
+			const auto_col = ADULTS_RATE_COLUMN_MAP[frm.doc.adults];
+			if (auto_col) frappe.model.set_value("Stay Rate Line", row.name, "rate_column", auto_col);
+			frm.refresh_field("rate_lines");
+		}
+
+		// Set default so every new rate_lines row picks up this room_type automatically
+		set_rate_line_room_type_default(frm);
+
+		// Also sync any already-existing rows
+		(frm.doc.rate_lines || []).forEach(row => {
+			frappe.model.set_value("Stay Rate Line", row.name, "room_type", frm.doc.room_type || "");
+		});
+	},
+
+	adults(frm) {
+		const rate_column = ADULTS_RATE_COLUMN_MAP[frm.doc.adults];
+		if (!rate_column) return;
+		(frm.doc.rate_lines || []).forEach(row => {
+			frappe.model.set_value("Stay Rate Line", row.name, "rate_column", rate_column);
+		});
 	},
 
 	check_in_date(frm) { frm.trigger("calculate_days"); },
@@ -248,6 +281,15 @@ frappe.ui.form.on("Stay Rate Line", {
 	discount3(frm, cdt, cdn)  { apply_line_discounts(frm, cdt, cdn); },
 	amount(frm)               { recalc_totals(frm); },
 });
+
+// ── Rate line defaults ────────────────────────────────────────────────────────
+
+function set_rate_line_room_type_default(frm) {
+	const grid = frm.fields_dict.rate_lines && frm.fields_dict.rate_lines.grid;
+	if (!grid) return;
+	const df = (grid.docfields || []).find(f => f.fieldname === "room_type");
+	if (df) df.default = frm.doc.room_type || "";
+}
 
 // ── Totals ────────────────────────────────────────────────────────────────────
 
