@@ -34,6 +34,13 @@ frappe.ui.form.on("Housekeeping Assignment", {
 	},
 
 	refresh(frm) {
+		// Restrict room picker to dirty rooms only
+		frm.set_query("room", "rooms", function () {
+			return {
+				filters: { status: ["in", ["Occupied Dirty", "Vacant Dirty"]] },
+			};
+		});
+
 		// Load Dirty Rooms button — always visible on unsaved/saved forms
 		frm.add_custom_button(__("Load Dirty Rooms"), function () {
 			frappe.call({
