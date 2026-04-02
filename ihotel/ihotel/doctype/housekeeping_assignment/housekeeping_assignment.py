@@ -73,10 +73,10 @@ def check_housekeeper_roster(housekeeper, date):
 
 @frappe.whitelist()
 def get_dirty_rooms():
-	"""Return all rooms currently with status Dirty."""
+	"""Return all rooms currently with status Occupied Dirty or Vacant Dirty."""
 	rooms = frappe.get_all(
 		"Room",
-		filters={"status": "Dirty"},
+		filters={"status": ["in", ["Occupied Dirty", "Vacant Dirty"]]},
 		fields=["name", "room_number", "floor", "room_type"],
 		order_by="floor asc, room_number asc",
 	)
