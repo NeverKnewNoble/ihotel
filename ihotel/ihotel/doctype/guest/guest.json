@@ -9,6 +9,7 @@
   "profile_tab",
   "title",
   "guest_name",
+  "customer",
   "section_break_jpeh",
   "phone",
   "email",
@@ -77,6 +78,15 @@
    "label": "Guest Name",
    "reqd": 1,
    "unique": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "ERPXpand Customer",
+   "no_copy": 1,
+   "options": "Customer",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_jpeh",

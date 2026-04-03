@@ -2,6 +2,16 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Housekeeper", {
+	refresh(frm) {
+		frappe.db.get_single_value("iHotel Settings", "housekeeping_department").then(dept => {
+			if (dept) {
+				frm.set_query("employee", function () {
+					return { filters: { department: dept } };
+				});
+			}
+		});
+	},
+
 	employee(frm) {
 		if (!frm.doc.employee) {
 			frm.set_value("phone", "");

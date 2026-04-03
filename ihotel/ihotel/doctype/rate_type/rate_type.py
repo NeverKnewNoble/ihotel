@@ -88,7 +88,7 @@ def get_erp_tax_accounts():
 	accounts = frappe.get_all(
 		"Account",
 		filters={"account_type": "Tax", "is_group": 0, "disabled": 0},
-		fields=["name", "account_name"],
+		fields=["name", "account_name", "tax_rate"],
 		order_by="account_name asc",
 	)
 	return accounts

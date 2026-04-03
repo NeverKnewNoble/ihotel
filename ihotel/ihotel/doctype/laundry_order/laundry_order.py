@@ -54,7 +54,15 @@ class LaundryOrder(Document):
 		self.db_set("status", "Cancelled")
 
 	def _post_to_folio(self):
-		if not self.post_to_folio or not self.ihotel_profile:
+		if not self.post_to_folio:
+			return
+		if not self.ihotel_profile:
+			frappe.msgprint(
+				_("Post to Folio is enabled but no iHotel Profile is linked. "
+				  "Select a Checked In record or link the profile manually."),
+				indicator="orange",
+				alert=True,
+			)
 			return
 		if flt(self.total_amount) <= 0:
 			return

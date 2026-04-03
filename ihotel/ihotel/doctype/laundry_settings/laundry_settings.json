@@ -9,6 +9,8 @@
   "column_break_lset1",
   "default_warehouse",
   "auto_create_sales_invoice",
+  "section_break_lset_items",
+  "laundry_item_group",
   "section_break_lset2",
   "enable_sms_notifications",
   "sms_gateway_url",
@@ -47,6 +49,18 @@
    "fieldname": "auto_create_sales_invoice",
    "fieldtype": "Check",
    "label": "Auto-Create Sales Invoice on Delivery"
+  },
+  {
+   "fieldname": "section_break_lset_items",
+   "fieldtype": "Section Break",
+   "label": "Laundry Items"
+  },
+  {
+   "description": "ERPXpand Item Group to pull laundry items from. Used to filter items in Laundry Orders.",
+   "fieldname": "laundry_item_group",
+   "fieldtype": "Link",
+   "label": "Laundry Item Group",
+   "options": "Item Group"
   },
   {
    "fieldname": "section_break_lset2",

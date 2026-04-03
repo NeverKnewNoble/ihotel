@@ -3,6 +3,23 @@
 
 frappe.ui.form.on("Laundry Order", {
 	refresh(frm) {
+		// Set an immediate safe filter (active items only) so the picker is never unfiltered,
+		// then tighten to the configured item group once the async settings call resolves.
+		frm.set_query("laundry_item", "items", function () {
+			return { filters: { is_active: 1 } };
+		});
+		frappe.db.get_single_value("Laundry Settings", "laundry_item_group").then(grp => {
+			if (!grp) return;
+			frm.set_query("laundry_item", "items", function () {
+				return { filters: { is_active: 1, item_group: grp } };
+			});
+		});
+
+		// If post_to_folio is already ticked but ihotel_profile is missing, try to auto-fill
+		if (frm.doc.post_to_folio && !frm.doc.ihotel_profile && frm.doc.reservation_id) {
+			frm.trigger("post_to_folio");
+		}
+
 		// Status indicator colour
 		const colour_map = {
 			"Draft": "grey",
@@ -58,6 +75,24 @@ frappe.ui.form.on("Laundry Order", {
 			if (ci.room) frm.set_value("room_number", ci.room);
 			if (ci.guest) frm.set_value("customer", ci.guest);
 			if (ci.profile) frm.set_value("ihotel_profile", ci.profile);
+		});
+	},
+
+	post_to_folio(frm) {
+		if (!frm.doc.post_to_folio || frm.doc.ihotel_profile) return;
+		if (!frm.doc.reservation_id) {
+			frappe.msgprint(__("Please select a Checked In record before posting to folio."));
+			frm.set_value("post_to_folio", 0);
+			return;
+		}
+		frappe.db.get_value("Checked In", frm.doc.reservation_id, "profile").then(r => {
+			const profile = r.message && r.message.profile;
+			if (profile) {
+				frm.set_value("ihotel_profile", profile);
+			} else {
+				frappe.msgprint(__("No iHotel Profile found for this stay. Please create a folio first."));
+				frm.set_value("post_to_folio", 0);
+			}
 		});
 	},
 

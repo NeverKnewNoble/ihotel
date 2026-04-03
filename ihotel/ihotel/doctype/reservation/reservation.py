@@ -39,7 +39,7 @@ class Reservation(Document):
 			if getdate(self.check_in_date) >= getdate(self.check_out_date):
 				frappe.throw(_("Check-in date must be before check-out date"))
 
-		if self.is_new() and self.check_in_date:
+		if self.is_new() and self.check_in_date and not self.flags.get("from_booking_com"):
 			if getdate(self.check_in_date) < getdate(nowdate()):
 				allow_past = frappe.db.get_single_value("iHotel Settings", "allow_past_dates")
 				if not allow_past:
@@ -144,9 +144,10 @@ class Reservation(Document):
 			return
 
 		valid_transitions = {
-			"pending": ["confirmed", "cancelled"],
-			"confirmed": ["cancelled"],
-			"cancelled": [],
+			"pending":    ["confirmed", "cancelled"],
+			"confirmed":  ["cancelled", "checked_in"],
+			"checked_in": ["cancelled"],
+			"cancelled":  [],
 		}
 
 		allowed = valid_transitions.get(old_status, [])
@@ -447,16 +448,17 @@ def convert_to_hotel_stay(reservation_name):
 		"rate_lines":           rate_lines,
 	})
 	hotel_stay.insert(ignore_permissions=True)
+	hotel_stay.submit()
 
 	# Link back to the guest profile
 	if guest:
 		reservation.db_set("guest", guest)
 
 	reservation.db_set("hotel_stay", hotel_stay.name)
-	reservation.db_set("status", "confirmed")
+	reservation.db_set("status", "checked_in")
 
 	frappe.msgprint(
-		_("Checked In {0} created successfully").format(
+		_("Guest checked in successfully. Stay record: {0}").format(
 			frappe.utils.get_link_to_form("Checked In", hotel_stay.name)
 		),
 		indicator="green",

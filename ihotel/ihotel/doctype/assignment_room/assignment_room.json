@@ -22,7 +22,6 @@
   },
   {
    "columns": 1,
-   "fetch_from": "room.floor",
    "fieldname": "floor",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -31,7 +30,6 @@
   },
   {
    "columns": 2,
-   "fetch_from": "room.room_type",
    "fieldname": "room_type",
    "fieldtype": "Link",
    "in_list_view": 1,

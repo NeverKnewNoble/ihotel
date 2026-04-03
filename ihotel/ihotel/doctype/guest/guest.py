@@ -11,6 +11,55 @@ class Guest(Document):
 	def validate(self):
 		self.validate_contact_info()
 
+	def after_insert(self):
+		self._sync_customer()
+
+	def on_update(self):
+		self._sync_customer()
+
+	def _sync_customer(self):
+		"""Create or update an ERPXpand Customer linked to this guest.
+
+		Reads the linked customer from the DB (not self) to avoid double-run issues
+		when after_insert and on_update fire back-to-back on a new guest.
+		"""
+		if not self.guest_name:
+			return
+		try:
+			db_customer = frappe.db.get_value("Guest", self.name, "customer")
+
+			if db_customer:
+				# Guest already linked — check if name changed (rename scenario)
+				current_name = frappe.db.get_value("Customer", db_customer, "customer_name")
+				if current_name and current_name != self.guest_name:
+					frappe.db.set_value("Customer", db_customer, "customer_name", self.guest_name,
+					                    update_modified=False)
+				return
+
+			# No link yet — find by name or create
+			existing = frappe.db.get_value("Customer", {"customer_name": self.guest_name})
+			if existing:
+				self.db_set("customer", existing, update_modified=False)
+				return
+
+			settings = frappe.get_single("iHotel Settings")
+			cust = frappe.get_doc({
+				"doctype": "Customer",
+				"customer_name": self.guest_name,
+				"customer_type": "Individual",
+				"customer_group": settings.get("default_customer_group") or "All Customer Groups",
+				"territory": settings.get("default_territory") or "All Territories",
+			})
+			cust.insert(ignore_permissions=True)
+			self.db_set("customer", cust.name, update_modified=False)
+		except Exception as e:
+			frappe.log_error(f"iHotel: Could not sync Guest {self.name} to Customer: {str(e)}")
+			frappe.msgprint(
+				_("Guest saved, but could not sync to ERPXpand Customer. Check the Error Log."),
+				indicator="orange",
+				alert=True,
+			)
+
 	def validate_contact_info(self):
 		if self.email:
 			if not validate_email_address(self.email):
