@@ -2,9 +2,10 @@
 // For license information, please see license.txt
 
 const STATUS_COLORS = {
-	pending:   "orange",
-	confirmed: "green",
-	cancelled: "red",
+	pending:    "orange",
+	confirmed:  "green",
+	checked_in: "blue",
+	cancelled:  "red",
 };
 
 const ADULTS_RATE_COLUMN_MAP = {
@@ -47,7 +48,7 @@ frappe.ui.form.on("Reservation", {
 
 		if (!frm.is_new()) {
 			// 1. Confirm — first
-			if (frm.doc.status === "pending") {
+			if (frm.doc.status === "pending" && frm.doc.status !== "checked_in") {
 				frm.add_custom_button(__("Confirm"), function () {
 					frm.set_value("status", "confirmed");
 					frm.save();

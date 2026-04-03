@@ -103,3 +103,15 @@ frappe.ui.form.on("Housekeeping Assignment", {
 			.addClass("btn-primary");
 	},
 });
+
+frappe.ui.form.on("Assignment Room", {
+	room(frm, cdt, cdn) {
+		const row = locals[cdt][cdn];
+		if (!row.room) return;
+		frappe.db.get_value("Room", row.room, ["floor", "room_type"]).then(r => {
+			if (!r.message) return;
+			frappe.model.set_value(cdt, cdn, "floor", r.message.floor || "");
+			frappe.model.set_value(cdt, cdn, "room_type", r.message.room_type || "");
+		});
+	},
+});

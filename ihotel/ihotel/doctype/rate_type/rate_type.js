@@ -19,6 +19,7 @@ frappe.ui.form.on("Rate Type", {
 						frappe.model.set_value(row.doctype, row.name, "tax_account", acc.name);
 						frappe.model.set_value(row.doctype, row.name, "tax_name", acc.account_name);
 						frappe.model.set_value(row.doctype, row.name, "charge_type", "On Net Total");
+						frappe.model.set_value(row.doctype, row.name, "rate", acc.tax_rate || 0);
 						added++;
 					}
 					frm.refresh_field("tax_schedule");

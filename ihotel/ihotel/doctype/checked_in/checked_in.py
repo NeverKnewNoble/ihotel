@@ -135,10 +135,26 @@ def notify_housekeeping(checked_in_name, service_type):
 @frappe.whitelist()
 def do_checkout(checked_in_name):
 	"""Set status to Checked Out and stamp actual_check_out, then trigger post-checkout hooks."""
+	from frappe.utils import flt
 	doc = frappe.get_doc("Checked In", checked_in_name)
 
 	if doc.status != "Checked In":
 		frappe.throw(_("Only guests with status 'Checked In' can be checked out."))
+
+	# Guard: night audit coverage (db_set bypasses validate, so enforce here)
+	doc._check_night_audit_coverage()
+
+	# Guard: outstanding balance
+	profile_name = frappe.db.get_value("Checked In", checked_in_name, "profile") or doc.profile
+	if profile_name:
+		outstanding = frappe.db.get_value("iHotel Profile", profile_name, "outstanding_balance") or 0
+		if flt(outstanding) > 0:
+			frappe.throw(
+				_("Cannot check out {0}. Outstanding balance of {1} must be settled before checkout.").format(
+					doc.guest, frappe.format_value(outstanding, {"fieldtype": "Currency"})
+				),
+				title=_("Outstanding Balance")
+			)
 
 	doc.db_set("status", "Checked Out", update_modified=True)
 	doc.db_set("actual_check_out", frappe.utils.now_datetime(), update_modified=True)
@@ -343,6 +359,7 @@ class CheckedIn(Document):
                 )
             )
         if self.status == "Checked Out":
+            self._check_night_audit_coverage()
             # Always read from DB — self.profile may be stale if folio was created after submit
             profile_name = frappe.db.get_value("Checked In", self.name, "profile") or self.profile
             if profile_name:
@@ -354,6 +371,38 @@ class CheckedIn(Document):
                         ),
                         title=_("Outstanding Balance")
                     )
+
+    def _check_night_audit_coverage(self):
+        """Block checkout if any night of the stay is missing a Night Audit record."""
+        from frappe.utils import getdate, add_days, nowdate, date_diff
+        start = getdate(self.actual_check_in or self.expected_check_in)
+        today = getdate(nowdate())
+        if start >= today:
+            return
+
+        # Single query for all audit dates in the stay range
+        posted = set(
+            str(d) for d in frappe.db.get_all(
+                "Night Audit",
+                filters={"audit_date": ["between", [str(start), str(add_days(today, -1))]]},
+                pluck="audit_date",
+            )
+        )
+
+        nights = date_diff(today, start)
+        missing = [
+            frappe.format_value(getdate(add_days(start, i)), {"fieldtype": "Date"})
+            for i in range(nights)
+            if str(getdate(add_days(start, i))) not in posted
+        ]
+
+        if missing:
+            frappe.throw(
+                _("Cannot check out. Night Audit has not been posted for: {0}").format(
+                    ", ".join(missing)
+                ),
+                title=_("Night Audit Required")
+            )
 
     def validate_dates(self):
         """

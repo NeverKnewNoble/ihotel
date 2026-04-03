@@ -104,7 +104,8 @@
   "customer_id",
   "amount",
   "confirmation_email_sent",
-  "amended_from"
+  "amended_from",
+  "booking_com_ref"
  ],
  "fields": [
   {
@@ -365,7 +366,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "pending\nconfirmed\ncancelled"
+   "options": "pending\nconfirmed\nchecked_in\ncancelled"
   },
   {
    "fieldname": "color",
@@ -645,6 +646,17 @@
    "search_index": 1
   },
   {
+   "fieldname": "booking_com_ref",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Booking.com Reference",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1,
+   "unique": 1
+  },
+  {
    "fieldname": "column_break_ytyy",
    "fieldtype": "Column Break"
   },
@@ -724,6 +736,10 @@
  {
   "color": "Green",
   "title": "confirmed"
+ },
+ {
+  "color": "Blue",
+  "title": "checked_in"
  },
  {
   "color": "Red",

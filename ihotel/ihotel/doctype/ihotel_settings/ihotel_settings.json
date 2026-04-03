@@ -35,7 +35,6 @@
   "early_checkin_fee",
   "section_break_rooms",
   "total_rooms",
-  "allow_past_dates",
   "notifications_tab",
   "section_break_email_from",
   "email_sender_name",
@@ -85,7 +84,17 @@
   "column_break_pol2",
   "privacy_policy",
   "hr_integration_tab",
-  "enforce_roster_check"
+  "enforce_roster_check",
+  "allow_past_dates",
+  "column_break_hr2",
+  "housekeeping_department",
+  "booking_com_tab",
+  "section_break_bcom",
+  "booking_com_enabled",
+  "column_break_bcom",
+  "booking_com_last_sync",
+  "section_break_bcom2",
+  "booking_com_ical_url"
  ],
  "fields": [
   {
@@ -396,6 +405,17 @@
    "label": "Enforce Roster Check for Housekeepers (Requires ERPXpand HRMS)"
   },
   {
+   "fieldname": "column_break_hr2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "When set, the Housekeeper employee picker will only show employees in this department.",
+   "fieldname": "housekeeping_department",
+   "fieldtype": "Link",
+   "label": "Housekeeping Department",
+   "options": "Department"
+  },
+  {
    "default": "0",
    "description": "When enabled, staff can create Reservations and Checked In records with past dates. Useful for data entry, migration, and walk-in back-dating. Leave disabled in normal operation to prevent accidental back-dating.",
    "fieldname": "allow_past_dates",
@@ -519,6 +539,44 @@
   {
    "fieldname": "section_break_nsgz",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "booking_com_tab",
+   "fieldtype": "Tab Break",
+   "label": "Booking.com"
+  },
+  {
+   "fieldname": "section_break_bcom",
+   "fieldtype": "Section Break",
+   "label": "iCal Sync"
+  },
+  {
+   "default": "0",
+   "description": "When enabled, the system polls the Booking.com iCal feed every 30 minutes and auto-creates confirmed Reservations.",
+   "fieldname": "booking_com_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Booking.com iCal Sync"
+  },
+  {
+   "fieldname": "column_break_bcom",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "booking_com_last_sync",
+   "fieldtype": "Datetime",
+   "label": "Last Synced",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_bcom2",
+   "fieldtype": "Section Break"
+  },
+  {
+   "depends_on": "eval:doc.booking_com_enabled",
+   "description": "Find this in your Booking.com Extranet: Property → Calendar → Export Calendar. Paste the full .ics URL here.",
+   "fieldname": "booking_com_ical_url",
+   "fieldtype": "Small Text",
+   "label": "iCal Feed URL"
   }
  ],
  "grid_page_length": 50,

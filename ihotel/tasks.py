@@ -168,6 +168,12 @@ def send_birthday_notifications():
 	frappe.db.commit()
 
 
+def sync_booking_com():
+	"""Poll Booking.com iCal feed and sync new/cancelled bookings into Reservations."""
+	from ihotel.booking_com import sync_bookings
+	sync_bookings()
+
+
 def night_audit_reminder():
 	"""Remind System Managers if no Night Audit exists for today by 11 PM."""
 	today = nowdate()

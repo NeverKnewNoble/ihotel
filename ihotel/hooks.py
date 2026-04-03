@@ -169,6 +169,9 @@ scheduler_events = {
 		"0 23 * * *": [
 			"ihotel.tasks.night_audit_reminder",
 		],
+		"*/30 * * * *": [
+			"ihotel.tasks.sync_booking_com",
+		],
 	},
 }
 
