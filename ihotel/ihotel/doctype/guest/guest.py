@@ -49,6 +49,7 @@ class Guest(Document):
 				"customer_type": "Individual",
 				"customer_group": settings.get("default_customer_group") or "All Customer Groups",
 				"territory": settings.get("default_territory") or "All Territories",
+				"mobile_no": self.phone,
 			})
 			cust.insert(ignore_permissions=True)
 			self.db_set("customer", cust.name, update_modified=False)

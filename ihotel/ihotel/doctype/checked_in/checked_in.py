@@ -833,6 +833,7 @@ class CheckedIn(Document):
         if customer:
             return customer
 
+        guest_phone = frappe.db.get_value("Guest", self.guest, "phone") if self.guest else None
         try:
             cust = frappe.get_doc({
                 "doctype": "Customer",
@@ -840,6 +841,7 @@ class CheckedIn(Document):
                 "customer_type": "Individual",
                 "customer_group": settings.get("default_customer_group") or "All Customer Groups",
                 "territory": settings.get("default_territory") or "All Territories",
+                "mobile_no": guest_phone,
             })
             cust.insert(ignore_permissions=True)
             return cust.name
