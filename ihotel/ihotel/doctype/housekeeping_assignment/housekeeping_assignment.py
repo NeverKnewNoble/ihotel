@@ -28,7 +28,7 @@ class HousekeepingAssignment(Document):
 	def on_update(self):
 		# Auto-send notification on first save if not yet sent
 		if not self.notification_sent and self.rooms:
-			self.send_notification()
+			send_notification(self.name)
 
 
 @frappe.whitelist()
