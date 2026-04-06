@@ -105,7 +105,12 @@
   "amount",
   "confirmation_email_sent",
   "amended_from",
-  "booking_com_ref"
+  "booking_com_ref",
+  "expedia_ref",
+  "airbnb_ref",
+  "agoda_ref",
+  "trip_com_ref",
+  "tripadvisor_ref"
  ],
  "fields": [
   {
@@ -650,6 +655,61 @@
    "fieldtype": "Data",
    "hidden": 1,
    "label": "Booking.com Reference",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "expedia_ref",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Expedia Reference",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "airbnb_ref",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Airbnb Reference",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "agoda_ref",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Agoda Reference",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "trip_com_ref",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Trip.com Reference",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "tripadvisor_ref",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Tripadvisor Reference",
    "no_copy": 1,
    "print_hide": 1,
    "read_only": 1,
