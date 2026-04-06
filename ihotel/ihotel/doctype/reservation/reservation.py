@@ -39,7 +39,7 @@ class Reservation(Document):
 			if getdate(self.check_in_date) >= getdate(self.check_out_date):
 				frappe.throw(_("Check-in date must be before check-out date"))
 
-		if self.is_new() and self.check_in_date and not self.flags.get("from_booking_com"):
+		if self.is_new() and self.check_in_date and not self.flags.get("from_booking_com") and not self.flags.get("from_ota_sync"):
 			if getdate(self.check_in_date) < getdate(nowdate()):
 				allow_past = frappe.db.get_single_value("iHotel Settings", "allow_past_dates")
 				if not allow_past:

@@ -94,7 +94,37 @@
   "column_break_bcom",
   "booking_com_last_sync",
   "section_break_bcom2",
-  "booking_com_ical_url"
+  "booking_com_ical_url",
+  "section_break_expedia",
+  "expedia_enabled",
+  "column_break_expedia",
+  "expedia_last_sync",
+  "section_break_expedia2",
+  "expedia_ical_url",
+  "section_break_airbnb",
+  "airbnb_enabled",
+  "column_break_airbnb",
+  "airbnb_last_sync",
+  "section_break_airbnb2",
+  "airbnb_ical_url",
+  "section_break_agoda",
+  "agoda_enabled",
+  "column_break_agoda",
+  "agoda_last_sync",
+  "section_break_agoda2",
+  "agoda_ical_url",
+  "section_break_trip_com",
+  "trip_com_enabled",
+  "column_break_trip_com",
+  "trip_com_last_sync",
+  "section_break_trip_com2",
+  "trip_com_ical_url",
+  "section_break_tripadvisor",
+  "tripadvisor_enabled",
+  "column_break_tripadvisor",
+  "tripadvisor_last_sync",
+  "section_break_tripadvisor2",
+  "tripadvisor_ical_url"
  ],
  "fields": [
   {
@@ -543,12 +573,12 @@
   {
    "fieldname": "booking_com_tab",
    "fieldtype": "Tab Break",
-   "label": "Booking.com"
+   "label": "OTA / Channel Manager"
   },
   {
    "fieldname": "section_break_bcom",
    "fieldtype": "Section Break",
-   "label": "iCal Sync"
+   "label": "Booking.com"
   },
   {
    "default": "0",
@@ -575,6 +605,171 @@
    "depends_on": "eval:doc.booking_com_enabled",
    "description": "Find this in your Booking.com Extranet: Property → Calendar → Export Calendar. Paste the full .ics URL here.",
    "fieldname": "booking_com_ical_url",
+   "fieldtype": "Small Text",
+   "label": "iCal Feed URL"
+  },
+  {
+   "fieldname": "section_break_expedia",
+   "fieldtype": "Section Break",
+   "label": "Expedia Group"
+  },
+  {
+   "default": "0",
+   "description": "When enabled, the system polls the Expedia iCal feed every 30 minutes and auto-creates confirmed Reservations.",
+   "fieldname": "expedia_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Expedia iCal Sync"
+  },
+  {
+   "fieldname": "column_break_expedia",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "expedia_last_sync",
+   "fieldtype": "Datetime",
+   "label": "Last Synced",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_expedia2",
+   "fieldtype": "Section Break"
+  },
+  {
+   "depends_on": "eval:doc.expedia_enabled",
+   "description": "Find this in your Expedia Partner Central: Calendar → Export / Sync. Paste the full .ics URL here.",
+   "fieldname": "expedia_ical_url",
+   "fieldtype": "Small Text",
+   "label": "iCal Feed URL"
+  },
+  {
+   "fieldname": "section_break_airbnb",
+   "fieldtype": "Section Break",
+   "label": "Airbnb"
+  },
+  {
+   "default": "0",
+   "description": "When enabled, the system polls the Airbnb iCal feed every 30 minutes and auto-creates confirmed Reservations.",
+   "fieldname": "airbnb_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Airbnb iCal Sync"
+  },
+  {
+   "fieldname": "column_break_airbnb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "airbnb_last_sync",
+   "fieldtype": "Datetime",
+   "label": "Last Synced",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_airbnb2",
+   "fieldtype": "Section Break"
+  },
+  {
+   "depends_on": "eval:doc.airbnb_enabled",
+   "description": "Find this in your Airbnb Host dashboard: Calendar → Availability → Export Calendar. Paste the full .ics URL here.",
+   "fieldname": "airbnb_ical_url",
+   "fieldtype": "Small Text",
+   "label": "iCal Feed URL"
+  },
+  {
+   "fieldname": "section_break_agoda",
+   "fieldtype": "Section Break",
+   "label": "Agoda"
+  },
+  {
+   "default": "0",
+   "description": "When enabled, the system polls the Agoda iCal feed every 30 minutes and auto-creates confirmed Reservations.",
+   "fieldname": "agoda_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Agoda iCal Sync"
+  },
+  {
+   "fieldname": "column_break_agoda",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "agoda_last_sync",
+   "fieldtype": "Datetime",
+   "label": "Last Synced",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_agoda2",
+   "fieldtype": "Section Break"
+  },
+  {
+   "depends_on": "eval:doc.agoda_enabled",
+   "description": "Find this in your Agoda YCS dashboard: Calendar → iCal Export. Paste the full .ics URL here.",
+   "fieldname": "agoda_ical_url",
+   "fieldtype": "Small Text",
+   "label": "iCal Feed URL"
+  },
+  {
+   "fieldname": "section_break_trip_com",
+   "fieldtype": "Section Break",
+   "label": "Trip.com"
+  },
+  {
+   "default": "0",
+   "description": "When enabled, the system polls the Trip.com iCal feed every 30 minutes and auto-creates confirmed Reservations.",
+   "fieldname": "trip_com_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Trip.com iCal Sync"
+  },
+  {
+   "fieldname": "column_break_trip_com",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "trip_com_last_sync",
+   "fieldtype": "Datetime",
+   "label": "Last Synced",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_trip_com2",
+   "fieldtype": "Section Break"
+  },
+  {
+   "depends_on": "eval:doc.trip_com_enabled",
+   "description": "Find this in your Trip.com Supplier Platform: Calendar → iCal Export. Paste the full .ics URL here.",
+   "fieldname": "trip_com_ical_url",
+   "fieldtype": "Small Text",
+   "label": "iCal Feed URL"
+  },
+  {
+   "fieldname": "section_break_tripadvisor",
+   "fieldtype": "Section Break",
+   "label": "Tripadvisor"
+  },
+  {
+   "default": "0",
+   "description": "When enabled, the system polls the Tripadvisor iCal feed every 30 minutes and auto-creates confirmed Reservations.",
+   "fieldname": "tripadvisor_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Tripadvisor iCal Sync"
+  },
+  {
+   "fieldname": "column_break_tripadvisor",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tripadvisor_last_sync",
+   "fieldtype": "Datetime",
+   "label": "Last Synced",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_tripadvisor2",
+   "fieldtype": "Section Break"
+  },
+  {
+   "depends_on": "eval:doc.tripadvisor_enabled",
+   "description": "Find this in your Tripadvisor Management Centre: Manage Listings → Calendar → Export. Paste the full .ics URL here.",
+   "fieldname": "tripadvisor_ical_url",
    "fieldtype": "Small Text",
    "label": "iCal Feed URL"
   }

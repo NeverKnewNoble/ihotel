@@ -171,6 +171,11 @@ scheduler_events = {
 		],
 		"*/30 * * * *": [
 			"ihotel.tasks.sync_booking_com",
+			"ihotel.tasks.sync_expedia",
+			"ihotel.tasks.sync_airbnb",
+			"ihotel.tasks.sync_agoda",
+			"ihotel.tasks.sync_trip_com",
+			"ihotel.tasks.sync_tripadvisor",
 		],
 	},
 }

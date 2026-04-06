@@ -46,6 +46,7 @@ class Guest(Document):
 			cust = frappe.get_doc({
 				"doctype": "Customer",
 				"customer_name": self.guest_name,
+				"custom_customer_id": self.guest_name,
 				"customer_type": "Individual",
 				"customer_group": settings.get("default_customer_group") or "All Customer Groups",
 				"territory": settings.get("default_territory") or "All Territories",

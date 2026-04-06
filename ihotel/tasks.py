@@ -170,8 +170,38 @@ def send_birthday_notifications():
 
 def sync_booking_com():
 	"""Poll Booking.com iCal feed and sync new/cancelled bookings into Reservations."""
-	from ihotel.booking_com import sync_bookings
-	sync_bookings()
+	from ihotel.ical_sync import sync_platform
+	sync_platform("booking_com")
+
+
+def sync_expedia():
+	"""Poll Expedia iCal feed and sync new/cancelled bookings into Reservations."""
+	from ihotel.ical_sync import sync_platform
+	sync_platform("expedia")
+
+
+def sync_airbnb():
+	"""Poll Airbnb iCal feed and sync new/cancelled bookings into Reservations."""
+	from ihotel.ical_sync import sync_platform
+	sync_platform("airbnb")
+
+
+def sync_agoda():
+	"""Poll Agoda iCal feed and sync new/cancelled bookings into Reservations."""
+	from ihotel.ical_sync import sync_platform
+	sync_platform("agoda")
+
+
+def sync_trip_com():
+	"""Poll Trip.com iCal feed and sync new/cancelled bookings into Reservations."""
+	from ihotel.ical_sync import sync_platform
+	sync_platform("trip_com")
+
+
+def sync_tripadvisor():
+	"""Poll Tripadvisor iCal feed and sync new/cancelled bookings into Reservations."""
+	from ihotel.ical_sync import sync_platform
+	sync_platform("tripadvisor")
 
 
 def night_audit_reminder():
