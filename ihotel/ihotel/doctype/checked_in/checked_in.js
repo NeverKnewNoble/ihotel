@@ -146,12 +146,34 @@ frappe.ui.form.on("Checked In", {
 						},
 					});
 				};
+				// Same rules as server: block if any night through yesterday has no Night Audit
+				const check_night_audit_then_checkout = () => {
+					frappe.call({
+						method: "ihotel.ihotel.doctype.checked_in.checked_in.get_night_audit_checkout_blockers",
+						args: { checked_in_name: frm.doc.name },
+						callback(r) {
+							const missing = (r.message && r.message.missing_dates) || [];
+							if (missing.length) {
+								frappe.msgprint({
+									title: __("Night Audit Required"),
+									message: __(
+										"Cannot check out. Night Audit has not been posted for: {0}",
+										[missing.join(", ")]
+									),
+									indicator: "red",
+								});
+								return;
+							}
+							do_checkout();
+						},
+					});
+				};
 				// Always fetch profile from DB — frm.doc.profile may be stale
 				// if the folio was created after the form was last loaded
 				frappe.db.get_value("Checked In", frm.doc.name, "profile").then(r => {
 					const profile = r.message && r.message.profile;
 					if (!profile) {
-						do_checkout();
+						check_night_audit_then_checkout();
 						return;
 					}
 					frappe.db.get_value("iHotel Profile", profile, "outstanding_balance").then(r2 => {
@@ -164,7 +186,7 @@ frappe.ui.form.on("Checked In", {
 								indicator: "red",
 							});
 						} else {
-							do_checkout();
+							check_night_audit_then_checkout();
 						}
 					});
 				});

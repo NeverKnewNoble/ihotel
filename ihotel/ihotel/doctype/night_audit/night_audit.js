@@ -3,6 +3,11 @@
 
 frappe.ui.form.on("Night Audit", {
 	refresh(frm) {
+		// Auto-set performed_by to current logged-in user for new docs.
+		if (frm.is_new() && !frm.doc.performed_by && frappe.session.user) {
+			frm.set_value("performed_by", frappe.session.user);
+		}
+
 		// Calculate metrics on form load (for new and existing forms)
 		if (frm.doc.audit_date) {
 			frm.call("calculate_metrics").then((r) => {
@@ -62,20 +67,50 @@ function print_trial_balance(data) {
 	const hotel = frappe.sys_defaults.company || "Hotel";
 	const fmt = (n) => frappe.format(n || 0, { fieldtype: "Currency" });
 	const pct = (n) => (n || 0).toFixed(1) + "%";
+	const esc = (s) => frappe.utils.escape_html(s || "—");
 
-	const revenue_rows = (data.revenue || []).map(r => `
+	// ── Section I: Charges / Guest Ledger ────────────────────────────────────
+	const charge_rows = (data.charges || []).map(r => `
 		<tr>
-			<td>${frappe.utils.escape_html(r.charge_type || "—")}</td>
+			<td>${esc(r.charge_type)}</td>
 			<td class="num">${fmt(r.total)}</td>
 		</tr>`).join("");
 
-	const payment_rows = (data.payments || []).map(p => `
+	// ── Section II: Collections (Cash + Card) ────────────────────────────────
+	const collection_rows = (data.collections || []).map(r => `
 		<tr>
-			<td>${frappe.utils.escape_html(p.payment_method || "—")}</td>
-			<td class="num">${fmt(p.total)}</td>
+			<td>${esc(r.payment_method)}</td>
+			<td class="num">${fmt(r.total)}</td>
 		</tr>`).join("");
 
-	const net_class = data.net_balance < 0 ? "neg" : "";
+	const comp_rows = (data.complimentary || []).map(r => `
+		<tr class="comp-row">
+			<td>${esc(r.payment_method)}</td>
+			<td class="num">${fmt(r.total)}</td>
+		</tr>`).join("");
+
+	const total_all_collections = (data.total_collections || 0) + (data.total_complimentary || 0);
+
+	// ── Section III: City Ledger ──────────────────────────────────────────────
+	const city_rows = (data.city_ledger || []).map(r => `
+		<tr>
+			<td>${esc(r.payment_method)}</td>
+			<td class="num">${fmt(r.total)}</td>
+		</tr>`).join("");
+
+	// ── Outstanding open folios ───────────────────────────────────────────────
+	const outstanding_rows = (data.outstanding_folios || []).map(r => `
+		<tr>
+			<td>${esc(r.room)} — ${esc(r.guest)}</td>
+			<td class="num">${fmt(r.outstanding_balance)}</td>
+		</tr>`).join("");
+
+	// ── Balance check ─────────────────────────────────────────────────────────
+	const diff = data.balance_difference || 0;
+	const diff_class = Math.abs(diff) < 0.01 ? "balanced" : "unbalanced";
+	const diff_label = Math.abs(diff) < 0.01
+		? "✓ BALANCED"
+		: (diff > 0 ? "OUTSTANDING (In-House Charges − Credits)" : "OVERPAYMENT");
 
 	const html = `<!DOCTYPE html>
 <html>
@@ -84,77 +119,251 @@ function print_trial_balance(data) {
 <title>Night Audit Trial Balance — ${data.audit_date}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Courier New', monospace; max-width: 560px; margin: 30px auto; padding: 24px; color: #111; font-size: 13px; }
-  h1  { text-align: center; font-size: 1.1em; letter-spacing: 2px; }
-  .sub { text-align: center; font-size: 0.82em; color: #555; margin-bottom: 4px; }
-  .date { text-align: center; font-size: 0.9em; font-weight: bold; margin-bottom: 16px; }
-  .dashed { border-top: 1px dashed #999; margin: 10px 0; }
-  .solid  { border-top: 2px solid #333; margin: 6px 0; }
-  table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; font-size: 0.78em; letter-spacing: 0.08em; text-transform: uppercase; color: #555; padding: 4px 0; }
+  body {
+    font-family: "Courier New", monospace;
+    color: #191919;
+    font-size: 13px;
+    line-height: 1.3;
+    background: #fff;
+    margin: 0;
+    padding: 22px;
+  }
+  .receipt {
+    max-width: 620px;
+    margin: 0 auto;
+  }
+  h1 {
+    text-align: center;
+    font-size: 30px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .sub {
+    text-align: center;
+    font-size: 13px;
+    letter-spacing: 2px;
+    color: #666;
+    margin-top: 4px;
+  }
+  .date {
+    text-align: center;
+    font-size: 20px;
+    font-weight: 700;
+    margin-top: 6px;
+    margin-bottom: 12px;
+  }
+  .dashed {
+    border-top: 1px dashed #b9b9b9;
+    margin: 10px 0;
+  }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+  th {
+    text-align: left;
+    color: #666;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 4px 0 3px;
+    border-bottom: 1px solid #d6d6d6;
+  }
   th.num, td.num { text-align: right; }
-  td { padding: 3px 0; }
-  .section-title { font-weight: bold; font-size: 0.85em; letter-spacing: 0.06em; text-transform: uppercase; margin: 14px 0 4px; }
-  .total-row td { font-weight: bold; border-top: 1px solid #333; padding-top: 5px; }
-  .net-row td { font-size: 1em; font-weight: bold; }
-  .neg { color: #dc2626; }
-  .stats { display: flex; gap: 24px; justify-content: center; margin: 12px 0; font-size: 0.82em; }
-  .stat-item { text-align: center; }
-  .stat-value { font-weight: bold; font-size: 1.1em; }
-  .footer { text-align: center; font-size: 0.75em; color: #777; margin-top: 20px; }
-  @media print { body { margin: 0; } }
+  td {
+    padding: 4px 1px;
+    vertical-align: top;
+    border-bottom: 1px solid #ececec;
+  }
+  tr:last-child td { border-bottom: none; }
+  .section-header {
+    margin: 14px 0 4px;
+    padding: 5px 8px;
+    background: #f1f1f1;
+    border-left: 3px solid #2f2f2f;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .subtotal-row td {
+    border-top: 2px solid #9b9b9b;
+    border-bottom: none;
+    font-weight: 700;
+    font-size: 24px;
+    padding-top: 8px;
+    padding-bottom: 4px;
+  }
+  .trial-row td {
+    border-bottom: none;
+    padding: 5px 1px;
+    font-size: 30px;
+  }
+  .trial-row td:first-child { font-size: 17px; }
+  .comp-row td { color: #5e5e5e; font-style: italic; }
+  .indent td:first-child { padding-left: 28px; }
+  .balanced td { color: #0d6b2f; font-weight: 700; }
+  .unbalanced td { color: #a52323; font-weight: 700; }
+  .stats {
+    display: flex;
+    margin: 10px 0 12px;
+    border: 1px dashed #c0c0c0;
+  }
+  .stat-item {
+    flex: 1;
+    text-align: center;
+    padding: 10px 6px 8px;
+    border-right: 1px dashed #c0c0c0;
+  }
+  .stat-item:last-child { border-right: none; }
+  .stat-value {
+    font-weight: 700;
+    font-size: 26px;
+    margin-bottom: 2px;
+  }
+  .stat-label {
+    color: #5f5f5f;
+    font-size: 11px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+  }
+  .footer {
+    text-align: center;
+    font-size: 11px;
+    color: #8a8a8a;
+    margin-top: 16px;
+  }
+  .note {
+    font-size: 11px;
+    color: #737373;
+    margin-top: 4px;
+    font-style: italic;
+  }
+  @media print {
+    body { margin: 0; padding: 14px; }
+    .section-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
 </style>
 </head>
 <body>
-  <h1>${hotel}</h1>
-  <div class="sub">NIGHT AUDIT — TRIAL BALANCE</div>
+  <div class="receipt">
+  <h1>${esc(hotel)}</h1>
+  <div class="sub">Night Audit — Trial Balance</div>
   <div class="date">${frappe.datetime.str_to_user(data.audit_date)}</div>
 
-  <div class="dashed"></div>
   <div class="stats">
-    <div class="stat-item"><div class="stat-value">${data.occupied_rooms}</div><div>Occupied</div></div>
-    <div class="stat-item"><div class="stat-value">${data.total_rooms}</div><div>Total Rooms</div></div>
-    <div class="stat-item"><div class="stat-value">${pct(data.occupancy_rate)}</div><div>Occupancy</div></div>
+    <div class="stat-item">
+      <div class="stat-value">${data.occupied_rooms} / ${data.total_rooms}</div>
+      <div class="stat-label">Rooms Occupied</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">${pct(data.occupancy_rate)}</div>
+      <div class="stat-label">Occupancy</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">${fmt(data.adr)}</div>
+      <div class="stat-label">ADR</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value">${fmt(data.revpar)}</div>
+      <div class="stat-label">RevPAR</div>
+    </div>
   </div>
-  <div class="dashed"></div>
 
-  <div class="section-title">Revenue</div>
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- SECTION I — CHARGES (GUEST LEDGER)                        -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div class="section-header">Section I &mdash; Charges (Guest Ledger)</div>
   <table>
     <thead><tr><th>Charge Type</th><th class="num">Amount</th></tr></thead>
     <tbody>
-      ${revenue_rows || '<tr><td colspan="2" style="color:#999;">No charges posted</td></tr>'}
-      <tr class="total-row"><td>Total Revenue</td><td class="num">${fmt(data.total_revenue)}</td></tr>
-    </tbody>
-  </table>
-
-  <div class="dashed"></div>
-
-  <div class="section-title">Payments Collected</div>
-  <table>
-    <thead><tr><th>Payment Method</th><th class="num">Amount</th></tr></thead>
-    <tbody>
-      ${payment_rows || '<tr><td colspan="2" style="color:#999;">No payments posted</td></tr>'}
-      <tr class="total-row"><td>Total Payments</td><td class="num">${fmt(data.total_payments)}</td></tr>
-    </tbody>
-  </table>
-
-  <div class="solid"></div>
-  <table>
-    <tbody>
-      <tr class="net-row ${net_class}">
-        <td>Net Balance (Revenue − Payments)</td>
-        <td class="num">${fmt(data.net_balance)}</td>
+      ${charge_rows || '<tr><td colspan="2" style="color:#aaa; padding:4px 0;">No charges posted for this date</td></tr>'}
+      <tr class="subtotal-row">
+        <td>Guest Ledger Total</td>
+        <td class="num">${fmt(data.total_charges)}</td>
       </tr>
     </tbody>
   </table>
 
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- SECTION II — COLLECTIONS                                  -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div class="section-header">Section II &mdash; Collections</div>
+  <table>
+    <thead><tr><th>Payment Method</th><th class="num">Amount</th></tr></thead>
+    <tbody>
+      ${collection_rows || '<tr><td colspan="2" style="color:#aaa; padding:4px 0;">No cash / card payments today</td></tr>'}
+      ${comp_rows}
+      <tr class="subtotal-row">
+        <td>Collections Total</td>
+        <td class="num">${fmt(total_all_collections)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- SECTION III — CITY LEDGER                                 -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div class="section-header">Section III &mdash; City Ledger</div>
+  <table>
+    <thead><tr><th>Account</th><th class="num">Amount</th></tr></thead>
+    <tbody>
+      ${city_rows || '<tr><td colspan="2" style="color:#aaa; padding:4px 0;">No city ledger transfers today</td></tr>'}
+      <tr class="subtotal-row">
+        <td>City Ledger Total</td>
+        <td class="num">${fmt(data.total_city_ledger)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- TRIAL BALANCE RECONCILIATION                              -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div class="section-header">Trial Balance</div>
+  <table>
+    <tbody>
+      <tr>
+        <td>Guest Ledger Total (Charges)</td>
+        <td class="num">${fmt(data.total_charges)}</td>
+      </tr>
+      <tr class="indent">
+        <td>Less: Collections</td>
+        <td class="num">(${fmt(total_all_collections)})</td>
+      </tr>
+      <tr class="indent">
+        <td>Less: City Ledger</td>
+        <td class="num">(${fmt(data.total_city_ledger)})</td>
+      </tr>
+      <tr class="${diff_class} trial-row">
+        <td>${diff_label}</td>
+        <td class="num">${fmt(Math.abs(diff))}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  ${(data.outstanding_folios || []).length > 0 ? `
+  <!-- Outstanding open folios for reference -->
+  <div class="dashed"></div>
+  <div class="section-header" style="background:#fff8e1; border-left-color:#b45309;">Open Folio Balances (In-House Guests)</div>
+  <table>
+    <thead><tr><th>Room — Guest</th><th class="num">Outstanding</th></tr></thead>
+    <tbody>
+      ${outstanding_rows}
+      <tr class="subtotal-row">
+        <td>Total Open Balances</td>
+        <td class="num">${fmt(data.total_outstanding)}</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="note">These balances represent in-house guests whose charges have not yet been fully settled.</p>
+  ` : ""}
+
   <div class="footer">
     <p>Printed: ${frappe.datetime.now_datetime()}</p>
+  </div>
   </div>
 </body>
 </html>`;
 
-	const w = window.open("", "_blank", "width=640,height=800,toolbar=0,menubar=0");
+	const w = window.open("", "_blank", "width=680,height=900,toolbar=0,menubar=0");
 	if (!w) { frappe.msgprint(__("Please allow popups to print.")); return; }
 	w.document.write(html);
 	w.document.close();

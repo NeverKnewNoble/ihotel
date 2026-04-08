@@ -8,12 +8,67 @@ from frappe.utils import getdate, add_days, add_months, add_years
 
 
 class MaintenanceRequest(Document):
+	def before_save(self):
+		# Keep previous assignee so we can notify only on actual assignment changes.
+		self._old_assigned_to = None
+		if not self.is_new():
+			self._old_assigned_to = frappe.db.get_value("Maintenance Request", self.name, "assigned_to")
+
+	def before_insert(self):
+		# Server-side fallback to always capture reporter for new records.
+		if not self.reported_by:
+			self.reported_by = frappe.session.user
+
 	def validate(self):
 		self.update_room_on_priority()
 		self.calculate_next_due_date()
 
 	def on_update(self):
 		self.sync_room_status()
+		self.notify_assignee_if_changed()
+
+	def notify_assignee_if_changed(self):
+		if not self.assigned_to:
+			return
+		if self.assigned_to == getattr(self, "_old_assigned_to", None):
+			return
+		self._send_assignment_notification()
+
+	def _send_assignment_notification(self):
+		subject = _("Maintenance Request Assigned — {0}").format(self.name)
+		message = _(
+			"You have been assigned Maintenance Request <b>{0}</b>.<br><br>"
+			"<b>Room:</b> {1}<br>"
+			"<b>Priority:</b> {2}<br>"
+			"<b>Status:</b> {3}<br>"
+			"<b>Description:</b> {4}"
+		).format(
+			self.name,
+			frappe.utils.escape_html(self.room or _("(not set)")),
+			frappe.utils.escape_html(self.priority or _("(not set)")),
+			frappe.utils.escape_html(self.status or _("Open")),
+			frappe.utils.escape_html(self.description or _("(no description)")),
+		)
+
+		# In-app bell notification
+		frappe.get_doc({
+			"doctype": "Notification Log",
+			"subject": subject,
+			"email_content": message,
+			"for_user": self.assigned_to,
+			"type": "Alert",
+			"document_type": "Maintenance Request",
+			"document_name": self.name,
+			"from_user": frappe.session.user,
+		}).insert(ignore_permissions=True)
+		# Notification Log already triggers the red-dot indicator via "notification".
+		# This extra event is only for a quick toast popup in desk.
+		frappe.publish_realtime(
+			"ihotel_new_notification",
+			{"subject": subject, "document_type": "Maintenance Request", "document_name": self.name},
+			user=self.assigned_to,
+			after_commit=True,
+		)
 
 	def update_room_on_priority(self):
 		if self.room and self.priority in ("Critical", "High") and self.status == "Open":

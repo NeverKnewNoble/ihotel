@@ -1,0 +1,151 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:account_name",
+ "creation": "2026-04-07 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "account_name",
+  "column_break_basic",
+  "account_code",
+  "section_break_type",
+  "account_type",
+  "folio_charge_types",
+  "column_break_type2",
+  "is_group",
+  "section_break_parent",
+  "parent_account",
+  "section_break_desc",
+  "description"
+ ],
+ "fields": [
+  {
+   "fieldname": "account_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Account Name",
+   "reqd": 1,
+   "bold": 1
+  },
+  {
+   "fieldname": "column_break_basic",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "account_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Account Code",
+   "description": "e.g. 4000 for Room Revenue, 4100 for F&B Revenue"
+  },
+  {
+   "fieldname": "section_break_type",
+   "fieldtype": "Section Break",
+   "label": "Classification"
+  },
+  {
+   "fieldname": "account_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Account Type",
+   "options": "\nRevenue\nPayment\nCity Ledger\nAsset\nLiability\nEquity\nExpense",
+   "reqd": 1
+  },
+  {
+   "description": "Comma-separated Folio Charge types (e.g. Room Charge) for lines with no Hotel Account set. Use one leaf account per type to avoid double counting.",
+   "fieldname": "folio_charge_types",
+   "fieldtype": "Small Text",
+   "label": "Folio charge types"
+  },
+  {
+   "fieldname": "column_break_type2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_group",
+   "fieldtype": "Check",
+   "label": "Is Group",
+   "description": "Group accounts act as headers and cannot receive direct postings."
+  },
+  {
+   "fieldname": "section_break_parent",
+   "fieldtype": "Section Break",
+   "label": "Hierarchy"
+  },
+  {
+   "fieldname": "parent_account",
+   "fieldtype": "Link",
+   "label": "Parent Account",
+   "options": "Hotel Account",
+   "description": "Parent must be a group account."
+  },
+  {
+   "fieldname": "section_break_desc",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-04-07 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "iHotel",
+ "name": "Hotel Account",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "General Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Hotel Accountant",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Front Desk Agent"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "account_code",
+ "sort_order": "ASC",
+ "states": [],
+ "title_field": "account_name",
+ "search_fields": "account_code,account_type"
+}

@@ -9,29 +9,29 @@ import frappe
 from frappe.model.document import Document
 from frappe import _
 from datetime import datetime, date
-from frappe.utils import getdate
+from frappe.utils import getdate, flt
+
+from ihotel.ihotel.doctype.hotel_account.hotel_account import resolve_hotel_account_for_charge_type
 
 class NightAudit(Document):
     def validate(self):
         """
         Validate night audit before submission.
         """
+        if not self.performed_by:
+            self.performed_by = frappe.session.user
         self.validate_audit_date()
         self.calculate_audit_metrics()
 
     def calculate_audit_metrics(self):
         """
         Calculate night audit metrics for the audit date:
-        - Total rooms from iHotel Settings
+        - Total rooms from Room doctype count
         - Occupied rooms: guests in-house on the audit date
         - Occupancy rate (occupied / total * 100)
         - Total revenue from in-house stays
         """
-        try:
-            settings = frappe.get_single("iHotel Settings")
-            self.total_rooms = settings.total_rooms or 0
-        except Exception:
-            frappe.throw(_("Please configure Total Rooms in iHotel Settings"))
+        self.total_rooms = frappe.db.count("Room") or 0
 
         audit_date = self.audit_date
         occupied_stays = frappe.db.sql("""
@@ -70,6 +70,7 @@ class NightAudit(Document):
         Run night audit process when document is submitted.
         """
         self.run_night_audit()
+        self._post_erpnext_journal_for_night_audit()
 
     def after_insert(self):
         """
@@ -147,9 +148,13 @@ class NightAudit(Document):
         if already_posted:
             return
 
+        # Tie folio line to Trial Balance Hotel Account when configured (folio_charge_types on Hotel Account).
+        room_hotel_account = resolve_hotel_account_for_charge_type("Room Charge")
+
         profile_doc.append("charges", {
             "charge_date": audit_date,
             "charge_type": "Room Charge",
+            "hotel_account": room_hotel_account,
             "description": _("Nightly room charge — Room {0} ({1})").format(
                 stay_doc.room or "", audit_date
             ),
@@ -160,6 +165,105 @@ class NightAudit(Document):
             "reference_name": stay_doc.name,
         })
         profile_doc.save(ignore_permissions=True)
+
+    def _post_erpnext_journal_for_night_audit(self):
+        """
+        When ERPXpand (ERPNext) is installed and iHotel Settings opt-in is on, post one Journal Entry
+        for in-house room revenue (Dr receivable / Cr room revenue). Checkout Sales Invoices should
+        omit Room Charge lines (same setting) so revenue is not doubled.
+        """
+        if "erpnext" not in frappe.get_installed_apps():
+            return
+
+        settings = frappe.get_single("iHotel Settings")
+        if not settings.get("enable_accounting_integration"):
+            return
+        if not settings.get("post_room_revenue_via_night_audit_je"):
+            return
+
+        if frappe.db.get_value("Night Audit", self.name, "erpnext_journal_entry"):
+            return
+
+        company = settings.company
+        ar_acct = settings.accounts_receivable_account
+        rev_acct = settings.room_revenue_account
+        if not all([company, ar_acct, rev_acct]):
+            frappe.msgprint(
+                _("Set Company, Accounts Receivable and Room Revenue in iHotel Settings to post night audit to ERPXpand."),
+                indicator="orange",
+                title=_("ERPXpand Journal Entry skipped"),
+            )
+            return
+
+        audit_date = self.audit_date
+        rows = frappe.db.sql(
+            """
+            SELECT name FROM `tabChecked In`
+            WHERE status = 'Checked In'
+            AND docstatus = 1
+            AND DATE(expected_check_in) <= %(date)s
+            AND DATE(expected_check_out) > %(date)s
+            """,
+            {"date": audit_date},
+            as_dict=True,
+        )
+
+        total_credit = 0.0
+        debit_entries = []
+
+        for row in rows:
+            stay = frappe.get_doc("Checked In", row.name)
+            rate = flt(stay.room_rate)
+            if rate <= 0:
+                continue
+            cust = stay._get_or_create_customer(settings, company)
+            if not cust:
+                frappe.log_error(f"Night audit JE: no ERPXpand Customer for stay {stay.name}")
+                continue
+            debit_entries.append((rate, cust))
+            total_credit += rate
+
+        if total_credit <= 0:
+            return
+
+        try:
+            je = frappe.new_doc("Journal Entry")
+            je.voucher_type = "Journal Entry"
+            je.company = company
+            je.posting_date = audit_date
+            je.user_remark = _("Night audit room revenue — {0}").format(self.name)
+
+            for rate, cust in debit_entries:
+                je.append(
+                    "accounts",
+                    {
+                        "account": ar_acct,
+                        "party_type": "Customer",
+                        "party": cust,
+                        "debit_in_account_currency": rate,
+                        "credit_in_account_currency": 0,
+                    },
+                )
+
+            je.append(
+                "accounts",
+                {
+                    "account": rev_acct,
+                    "debit_in_account_currency": 0,
+                    "credit_in_account_currency": total_credit,
+                },
+            )
+
+            je.insert(ignore_permissions=True)
+            je.submit()
+            self.db_set("erpnext_journal_entry", je.name, update_modified=False)
+        except Exception as e:
+            frappe.log_error(f"Night audit ERPXpand JE failed: {self.name} — {e!s}")
+            frappe.msgprint(
+                _("Night audit saved folio charges, but ERPXpand Journal Entry failed. See Error Log."),
+                indicator="orange",
+                title=_("ERPXpand"),
+            )
 
     # def create_journal_entry(self, stay_doc):
     #     """
@@ -219,11 +323,19 @@ class NightAudit(Document):
     @frappe.whitelist()
     def get_trial_balance(self):
         """
-        Build a Trial Balance for the audit date.
-        Returns revenue grouped by charge type and payments grouped by payment method.
+        Build a proper hotel Trial Balance for the audit date.
+
+        Structure:
+          Section I  — Charges (Guest Ledger): all revenue posted today by charge type
+          Section II — Collections: cash & card payments received today
+          Section III — City Ledger: amounts transferred to corporate/AR accounts today
+
+        Balance equation:
+          Guest Ledger Total = Collections + City Ledger + Net Outstanding
         """
         audit_date = self.audit_date
 
+        # ── Section I: Revenue / Charges ─────────────────────────────────────
         revenue_rows = frappe.db.sql("""
             SELECT
                 fc.charge_type,
@@ -231,36 +343,109 @@ class NightAudit(Document):
             FROM `tabFolio Charge` fc
             INNER JOIN `tabiHotel Profile` p ON p.name = fc.parent
             WHERE DATE(fc.charge_date) = %(date)s
-            AND p.status != 'Transferred'
             GROUP BY fc.charge_type
             ORDER BY fc.charge_type
         """, {"date": audit_date}, as_dict=True)
 
-        payment_rows = frappe.db.sql("""
+        # ── Section II: Cash & Card Collections ──────────────────────────────
+        # All payment methods EXCEPT City Ledger and Complimentary
+        CASH_CARD_METHODS = (
+            "Cash", "Visa", "Mastercard", "Amex",
+            "Bank Transfer", "Cheque"
+        )
+        collection_rows = frappe.db.sql("""
             SELECT
                 pi.payment_method,
                 SUM(pi.rate) AS total
             FROM `tabPayment Items` pi
             INNER JOIN `tabiHotel Profile` p ON p.name = pi.parent
             WHERE DATE(pi.date) = %(date)s
-            AND p.status != 'Transferred'
+            AND pi.payment_method IN %(methods)s
             GROUP BY pi.payment_method
             ORDER BY pi.payment_method
+        """, {"date": audit_date, "methods": CASH_CARD_METHODS}, as_dict=True)
+
+        # ── Complimentary (shown separately within collections) ───────────────
+        comp_rows = frappe.db.sql("""
+            SELECT
+                pi.payment_method,
+                SUM(pi.rate) AS total
+            FROM `tabPayment Items` pi
+            INNER JOIN `tabiHotel Profile` p ON p.name = pi.parent
+            WHERE DATE(pi.date) = %(date)s
+            AND pi.payment_method = 'Complimentary'
+            GROUP BY pi.payment_method
         """, {"date": audit_date}, as_dict=True)
 
-        total_revenue  = sum(r.total or 0 for r in revenue_rows)
-        total_payments = sum(r.total or 0 for r in payment_rows)
+        # ── Section III: City Ledger Transfers ────────────────────────────────
+        city_ledger_rows = frappe.db.sql("""
+            SELECT
+                pi.payment_method,
+                SUM(pi.rate) AS total
+            FROM `tabPayment Items` pi
+            INNER JOIN `tabiHotel Profile` p ON p.name = pi.parent
+            WHERE DATE(pi.date) = %(date)s
+            AND pi.payment_method = 'City Ledger'
+            GROUP BY pi.payment_method
+        """, {"date": audit_date}, as_dict=True)
+
+        # ── Outstanding open folio balances (in-house guests) ────────────────
+        outstanding_rows = frappe.db.sql("""
+            SELECT
+                p.name AS profile,
+                p.guest,
+                p.room,
+                p.outstanding_balance
+            FROM `tabiHotel Profile` p
+            WHERE p.status = 'Open'
+            AND p.outstanding_balance > 0
+            ORDER BY p.room
+        """, as_dict=True)
+
+        # ── Totals ────────────────────────────────────────────────────────────
+        total_charges      = sum(r.total or 0 for r in revenue_rows)
+        total_collections  = sum(r.total or 0 for r in collection_rows)
+        total_complimentary = sum(r.total or 0 for r in comp_rows)
+        total_city_ledger  = sum(r.total or 0 for r in city_ledger_rows)
+        total_outstanding  = sum(r.outstanding_balance or 0 for r in outstanding_rows)
+
+        # Net balance check: charges should equal collections + city ledger + outstanding
+        # (small float differences are normal; this is the reconciliation figure)
+        balance_difference = round(
+            total_charges - total_collections - total_complimentary - total_city_ledger,
+            2
+        )
 
         return {
-            "audit_date":     str(audit_date),
-            "revenue":        revenue_rows,
-            "payments":       payment_rows,
-            "total_revenue":  total_revenue,
-            "total_payments": total_payments,
-            "net_balance":    round(total_revenue - total_payments, 2),
-            "occupied_rooms": self.occupied_rooms or 0,
-            "total_rooms":    self.total_rooms or 0,
-            "occupancy_rate": self.occupancy_rate or 0,
+            "audit_date":           str(audit_date),
+            # Section I
+            "charges":              revenue_rows,
+            "total_charges":        round(total_charges, 2),
+            # Section II
+            "collections":          collection_rows,
+            "complimentary":        comp_rows,
+            "total_collections":    round(total_collections, 2),
+            "total_complimentary":  round(total_complimentary, 2),
+            # Section III
+            "city_ledger":          city_ledger_rows,
+            "total_city_ledger":    round(total_city_ledger, 2),
+            # Outstanding (in-house)
+            "outstanding_folios":   outstanding_rows,
+            "total_outstanding":    round(total_outstanding, 2),
+            # Reconciliation
+            "balance_difference":   balance_difference,
+            # Occupancy metrics
+            "occupied_rooms":       self.occupied_rooms or 0,
+            "total_rooms":          self.total_rooms or 0,
+            "occupancy_rate":       self.occupancy_rate or 0,
+            "adr":                  self.adr or 0,
+            "revpar":               self.revpar or 0,
+            # Legacy aliases kept for any existing callers
+            "revenue":              revenue_rows,
+            "payments":             collection_rows,
+            "total_revenue":        round(total_charges, 2),
+            "total_payments":       round(total_collections + total_complimentary, 2),
+            "net_balance":          balance_difference,
         }
 
     @frappe.whitelist()

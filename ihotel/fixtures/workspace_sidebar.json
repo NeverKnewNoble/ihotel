@@ -92,6 +92,23 @@
     "url": null
    },
    {
+    "child": 1,
+    "collapsible": 1,
+    "display_depends_on": null,
+    "filters": null,
+    "icon": "book-copy",
+    "indent": 0,
+    "keep_closed": 0,
+    "label": "Trial Balance",
+    "link_to": "trial_balance",
+    "link_type": "Page",
+    "navigate_to_tab": null,
+    "route_options": null,
+    "show_arrow": 0,
+    "type": "Link",
+    "url": null
+   },
+   {
     "child": 0,
     "collapsible": 1,
     "display_depends_on": null,
@@ -874,6 +891,23 @@
     "url": null
    },
    {
+    "child": 1,
+    "collapsible": 1,
+    "display_depends_on": null,
+    "filters": null,
+    "icon": "list",
+    "indent": 0,
+    "keep_closed": 0,
+    "label": "Hotel Account",
+    "link_to": "Hotel Account",
+    "link_type": "DocType",
+    "navigate_to_tab": null,
+    "route_options": null,
+    "show_arrow": 0,
+    "type": "Link",
+    "url": null
+   },
+   {
     "child": 0,
     "collapsible": 1,
     "display_depends_on": null,
@@ -891,7 +925,7 @@
     "url": null
    }
   ],
-  "modified": "2026-03-27 19:36:27.894224",
+  "modified": "2026-04-08 01:36:12.826806",
   "module": "iHotel",
   "name": "iHotel",
   "standard": 0,

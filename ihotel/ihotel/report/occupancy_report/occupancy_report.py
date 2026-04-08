@@ -31,10 +31,7 @@ def get_data(filters):
     from_date = getdate(filters.get("from_date") or frappe.utils.add_months(frappe.utils.today(), -1))
     to_date   = getdate(filters.get("to_date")   or frappe.utils.today())
 
-    total_rooms = flt(frappe.get_single("iHotel Settings").get("total_rooms") or 0)
-    if not total_rooms:
-        total_rooms = flt(frappe.db.count("Room",
-            filters={"status": ["not in", ["Out of Order", "Out of Service"]]}))
+    total_rooms = flt(frappe.db.count("Room") or 0)
 
     data = []
     current = from_date

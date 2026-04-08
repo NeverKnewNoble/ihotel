@@ -79,6 +79,7 @@
    "fieldtype": "Section Break"
   },
   {
+   "default": "__user",
    "fieldname": "reported_by",
    "fieldtype": "Link",
    "label": "Reported By",

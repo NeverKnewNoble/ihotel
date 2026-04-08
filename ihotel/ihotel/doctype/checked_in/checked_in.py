@@ -167,6 +167,14 @@ def do_checkout(checked_in_name):
 
 
 @frappe.whitelist()
+def get_night_audit_checkout_blockers(checked_in_name):
+	"""Return formatted dates missing Night Audit (for desk Check Out button)."""
+	frappe.has_permission("Checked In", "read", checked_in_name, throw=True)
+	doc = frappe.get_doc("Checked In", checked_in_name)
+	return {"missing_dates": doc._get_missing_night_audit_dates()}
+
+
+@frappe.whitelist()
 def move_room(checked_in_name, new_room, reason=None):
 	"""
 	Move a checked-in guest to a different room.
@@ -372,36 +380,47 @@ class CheckedIn(Document):
                         title=_("Outstanding Balance")
                     )
 
-    def _check_night_audit_coverage(self):
-        """Block checkout if any night of the stay is missing a Night Audit record."""
+    def _get_missing_night_audit_dates(self):
+        """
+        Each calendar date from check-in through yesterday must have a Night Audit
+        before checkout (today's audit is not required yet). If Night Audit is
+        submittable, only submitted documents count as posted.
+        """
         from frappe.utils import getdate, add_days, nowdate, date_diff
+
         start = getdate(self.actual_check_in or self.expected_check_in)
         today = getdate(nowdate())
         if start >= today:
-            return
+            return []
 
-        # Single query for all audit dates in the stay range
+        filters = {
+            "audit_date": ["between", [str(start), str(add_days(today, -1))]],
+        }
+        if frappe.get_meta("Night Audit").is_submittable:
+            filters["docstatus"] = 1
+
         posted = set(
-            str(d) for d in frappe.db.get_all(
-                "Night Audit",
-                filters={"audit_date": ["between", [str(start), str(add_days(today, -1))]]},
-                pluck="audit_date",
-            )
+            str(d)
+            for d in frappe.get_all("Night Audit", filters=filters, pluck="audit_date")
         )
 
         nights = date_diff(today, start)
-        missing = [
-            frappe.format_value(getdate(add_days(start, i)), {"fieldtype": "Date"})
-            for i in range(nights)
-            if str(getdate(add_days(start, i))) not in posted
-        ]
+        missing = []
+        for i in range(nights):
+            d = getdate(add_days(start, i))
+            if str(d) not in posted:
+                missing.append(frappe.format_value(d, {"fieldtype": "Date"}))
+        return missing
 
+    def _check_night_audit_coverage(self):
+        """Block checkout if any night of the stay is missing a Night Audit record."""
+        missing = self._get_missing_night_audit_dates()
         if missing:
             frappe.throw(
                 _("Cannot check out. Night Audit has not been posted for: {0}").format(
                     ", ".join(missing)
                 ),
-                title=_("Night Audit Required")
+                title=_("Night Audit Required"),
             )
 
     def validate_dates(self):
@@ -797,6 +816,15 @@ class CheckedIn(Document):
 
             invoice = self._build_sales_invoice(profile, customer, company, settings)
             if not invoice:
+                if profile.get("payments"):
+                    frappe.log_error(
+                        title="iHotel checkout: payments without Sales Invoice",
+                        message=(
+                            f"Stay {self.name}: folio has payments but no Sales Invoice was built "
+                            "(e.g. room-only folio with Night Audit Journal Entry mode). "
+                            "Record receipts in ERPXpand manually if needed."
+                        ),
+                    )
                 return
 
             self.db_set("sales_invoice", invoice.name, update_modified=False)
@@ -867,7 +895,15 @@ class CheckedIn(Document):
         if settings.get("accounts_receivable_account"):
             invoice.debit_to = settings.accounts_receivable_account
 
+        skip_room_on_invoice = (
+            "erpnext" in frappe.get_installed_apps()
+            and settings.get("enable_accounting_integration")
+            and settings.get("post_room_revenue_via_night_audit_je")
+        )
+
         for charge in profile.charges:
+            if skip_room_on_invoice and charge.charge_type == "Room Charge":
+                continue
             is_room = (charge.charge_type == "Room Charge")
             item_code = room_item if is_room else extra_item
             if not item_code:

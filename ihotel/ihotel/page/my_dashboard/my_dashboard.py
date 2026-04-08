@@ -10,7 +10,7 @@ def get_dashboard_data():
     # Hotel settings
     settings = frappe.get_single("iHotel Settings")
     hotel_name = settings.hotel_name or "iHotel"
-    total_rooms = settings.total_rooms or 0
+    total_rooms = frappe.db.count("Room") or 0
 
     # Room status breakdown
     room_counts = frappe.db.sql(

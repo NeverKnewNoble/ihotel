@@ -2,6 +2,12 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Maintenance Request", {
+	onload(frm) {
+		if (frm.is_new() && !frm.doc.reported_by) {
+			frm.set_value("reported_by", frappe.session.user);
+		}
+	},
+
 	refresh(frm) {
 		if (frm.is_new()) return;
 
