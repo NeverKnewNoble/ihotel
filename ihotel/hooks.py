@@ -41,7 +41,7 @@ fixtures = [
 
 # include js, css files in header of desk.html
 app_include_css = "/assets/ihotel/css/ihotel.css"
-# app_include_js = "/assets/ihotel/js/ihotel.js"
+app_include_js = "/assets/ihotel/js/ihotel_notifications.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/ihotel/css/ihotel.css"
@@ -55,7 +55,9 @@ app_include_css = "/assets/ihotel/css/ihotel.css"
 # webform_include_css = {"doctype": "public/css/doctype.css"}
 
 # include js in page
-# page_js = {"page" : "public/js/file.js"}
+# (trial_balance.js is loaded once via Page.load_assets from the page folder;
+# do not also list it here or the script runs twice and `class TrialBalance` redeclares.)
+# page_js = {"trial_balance": "ihotel/page/trial_balance/trial_balance.js"}
 
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
@@ -187,6 +189,9 @@ doc_events = {
 	},
 	# Reservation confirmation is handled by the "Reservation Confirmation Letter" Notification fixture
 }
+
+# Desk boot: ERPNext detection for sidebar + iHotel Settings (Accounting tab)
+boot_session = "ihotel.boot.extend_boot_session"
 
 # Testing
 # -------

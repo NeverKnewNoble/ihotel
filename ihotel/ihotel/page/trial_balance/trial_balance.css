@@ -1,0 +1,563 @@
+/*
+ * Trial Balance — modern flat UI (no gradients), scoped to this desk page.
+ */
+.page-container[data-page-route="trial_balance"] .trial-balance-container.tb-surface {
+	--tb-bg: #f4f4f5;
+	--tb-panel: #ffffff;
+	--tb-border: #e4e4e7;
+	--tb-border-strong: #d4d4d8;
+	--tb-text: #18181b;
+	--tb-muted: #71717a;
+	--tb-subtle: #a1a1aa;
+	--tb-primary: #2563eb;
+	--tb-primary-hover: #1d4ed8;
+	--tb-success: #16a34a;
+	--tb-success-bg: #f0fdf4;
+	--tb-danger: #dc2626;
+	--tb-danger-bg: #fef2f2;
+	--tb-warn: #ca8a04;
+	--tb-radius: 12px;
+	--tb-radius-sm: 8px;
+	--tb-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	--tb-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+	box-sizing: border-box;
+	font-family: var(--tb-font);
+	color: var(--tb-text);
+	background: var(--tb-bg);
+	padding: 1.25rem 1.25rem 2rem;
+	max-width: 1400px;
+	margin: 0 auto;
+}
+
+.page-container[data-page-route="trial_balance"] .trial-balance-container.tb-surface *,
+.page-container[data-page-route="trial_balance"] .trial-balance-container.tb-surface *::before,
+.page-container[data-page-route="trial_balance"] .trial-balance-container.tb-surface *::after {
+	box-sizing: inherit;
+}
+
+/* —— Header —— */
+.page-container[data-page-route="trial_balance"] .tb-page-header {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 1rem 1.5rem;
+	margin-bottom: 1.25rem;
+	padding: 0;
+	background: transparent;
+	border: none;
+	box-shadow: none;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-page-header__titles h1 {
+	margin: 0 0 0.25rem 0;
+	font-size: 1.5rem;
+	font-weight: 650;
+	letter-spacing: -0.02em;
+	color: var(--tb-text);
+	line-height: 1.2;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-page-header__sub {
+	margin: 0;
+	font-size: 0.875rem;
+	color: var(--tb-muted);
+	font-weight: 400;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-header-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: center;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-icon {
+	display: inline-block;
+	vertical-align: middle;
+	margin-right: 0.4rem;
+	flex-shrink: 0;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-icon svg {
+	display: block;
+	width: 1rem;
+	height: 1rem;
+	stroke: currentColor;
+	fill: none;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+/* —— Buttons (flat) —— */
+.page-container[data-page-route="trial_balance"] .tb-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.35rem;
+	padding: 0.5rem 0.875rem;
+	font-size: 0.8125rem;
+	font-weight: 500;
+	font-family: inherit;
+	line-height: 1.25;
+	border-radius: var(--tb-radius-sm);
+	border: 1px solid transparent;
+	cursor: pointer;
+	background: var(--tb-panel);
+	color: var(--tb-text);
+	transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.page-container[data-page-route="trial_balance"] .tb-btn {
+		transition: none;
+	}
+}
+
+.page-container[data-page-route="trial_balance"] .tb-btn:hover {
+	border-color: var(--tb-border-strong);
+	background: #fafafa;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-btn:active {
+	transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.page-container[data-page-route="trial_balance"] .tb-btn:active {
+		transform: none;
+	}
+}
+
+.page-container[data-page-route="trial_balance"] .tb-btn--primary {
+	background: var(--tb-primary);
+	color: #fff;
+	border-color: var(--tb-primary);
+}
+
+.page-container[data-page-route="trial_balance"] .tb-btn--primary:hover {
+	background: var(--tb-primary-hover);
+	border-color: var(--tb-primary-hover);
+	color: #fff;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-btn--secondary {
+	border-color: var(--tb-border);
+	background: var(--tb-panel);
+	color: var(--tb-text);
+}
+
+.page-container[data-page-route="trial_balance"] .tb-btn--secondary:hover {
+	border-color: var(--tb-border-strong);
+	background: #fafafa;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-btn-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+/* —— Filters panel —— */
+.page-container[data-page-route="trial_balance"] .tb-filters-section {
+	background: var(--tb-panel);
+	padding: 1.125rem 1.25rem;
+	border-radius: var(--tb-radius);
+	border: 1px solid var(--tb-border);
+	margin-bottom: 1.25rem;
+	box-shadow: none;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-filters-section label {
+	display: block;
+	font-weight: 500;
+	font-size: 0.75rem;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--tb-muted);
+	margin-bottom: 0.35rem;
+}
+
+/* Filters: reset desk/Bootstrap .form-control quirks (asymmetric vertical padding on dates) */
+.page-container[data-page-route="trial_balance"] .tb-filters-section .form-control {
+	border-radius: var(--tb-radius-sm);
+	border: 1px solid var(--tb-border);
+	font-size: 0.875rem;
+	color: var(--tb-text);
+	background: #fafafa;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+	width: 100%;
+	box-sizing: border-box;
+	/* One consistent control height; equal top/bottom padding */
+	min-height: 2.5rem;
+	padding: 0.5rem 0.75rem;
+	line-height: 1.35;
+	margin: 0;
+	vertical-align: middle;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-filters-section select.form-control {
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	appearance: none;
+	cursor: pointer;
+	padding-right: 2rem;
+	background-color: #fafafa;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 0.65rem center;
+	background-size: 1rem;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-filters-section select.form-control:focus {
+	background-color: var(--tb-panel);
+}
+
+.page-container[data-page-route="trial_balance"] .tb-filters-section input[type="date"].form-control,
+.page-container[data-page-route="trial_balance"] .tb-filters-section input[type="datetime-local"].form-control {
+	/* Avoid line-height = height tricks; they fight WebKit’s date internals */
+	line-height: 1.35;
+	min-height: 2.5rem;
+}
+
+/* WebKit/Chromium: remove extra wrapper padding that shoves value + icon to the bottom */
+.page-container[data-page-route="trial_balance"]
+	.tb-filters-section
+	input[type="date"].form-control::-webkit-datetime-edit-fields-wrapper {
+	padding: 0;
+	margin: 0;
+}
+
+.page-container[data-page-route="trial_balance"]
+	.tb-filters-section
+	input[type="date"].form-control::-webkit-datetime-edit {
+	padding: 0;
+	margin: 0;
+	height: 100%;
+}
+
+.page-container[data-page-route="trial_balance"]
+	.tb-filters-section
+	input[type="date"].form-control::-webkit-calendar-picker-indicator {
+	cursor: pointer;
+	opacity: 0.75;
+	margin: 0;
+	padding: 0 0 0 0.35rem;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-filters-section .form-control:focus {
+	outline: none;
+	border-color: var(--tb-primary);
+	box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+	background: var(--tb-panel);
+}
+
+/* —— Summary stats —— */
+.page-container[data-page-route="trial_balance"] .tb-summary-section {
+	margin-bottom: 1.25rem;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-stat-card {
+	position: relative;
+	background: var(--tb-panel);
+	border: 1px solid var(--tb-border);
+	border-radius: var(--tb-radius);
+	padding: 1rem 1.125rem;
+	height: 100%;
+	text-align: left;
+	overflow: hidden;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.page-container[data-page-route="trial_balance"] .tb-stat-card {
+		transition: none;
+	}
+}
+
+.page-container[data-page-route="trial_balance"] .tb-stat-card:hover {
+	border-color: var(--tb-border-strong);
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.page-container[data-page-route="trial_balance"] .tb-stat-card::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	width: 3px;
+	background: var(--tb-stat-accent, var(--tb-border-strong));
+}
+
+.page-container[data-page-route="trial_balance"] .tb-stat-card--debit {
+	--tb-stat-accent: #2563eb;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-stat-card--credit {
+	--tb-stat-accent: #7c3aed;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-stat-card--diff {
+	--tb-stat-accent: #d97706;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-stat-card--status {
+	--tb-stat-accent: #64748b;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-stat-card h4 {
+	margin: 0 0 0.5rem 0;
+	color: var(--tb-muted);
+	font-size: 0.6875rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-stat-card .amount {
+	font-size: 1.375rem;
+	font-weight: 650;
+	color: var(--tb-text);
+	font-variant-numeric: tabular-nums;
+	font-family: var(--tb-mono);
+	letter-spacing: -0.02em;
+	line-height: 1.2;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-stat-card .status {
+	min-height: 1.75rem;
+	display: flex;
+	align-items: center;
+}
+
+/* Status pills (flat) */
+.page-container[data-page-route="trial_balance"] .tb-pill {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.25rem 0.65rem;
+	font-size: 0.75rem;
+	font-weight: 600;
+	border-radius: 9999px;
+	border: 1px solid var(--tb-border);
+	background: #fafafa;
+	color: var(--tb-muted);
+}
+
+.page-container[data-page-route="trial_balance"] .tb-pill--success {
+	background: var(--tb-success-bg);
+	border-color: #bbf7d0;
+	color: var(--tb-success);
+}
+
+.page-container[data-page-route="trial_balance"] .tb-pill--danger {
+	background: var(--tb-danger-bg);
+	border-color: #fecaca;
+	color: var(--tb-danger);
+}
+
+.page-container[data-page-route="trial_balance"] .tb-pill--muted {
+	background: #f4f4f5;
+	border-color: var(--tb-border);
+	color: var(--tb-muted);
+}
+
+/* —— Table —— */
+.page-container[data-page-route="trial_balance"] .tb-table-section {
+	background: var(--tb-panel);
+	border-radius: var(--tb-radius);
+	border: 1px solid var(--tb-border);
+	overflow: hidden;
+	box-shadow: none;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-table-section .table-responsive {
+	margin: 0;
+}
+
+.page-container[data-page-route="trial_balance"] .trial-balance-table {
+	margin: 0;
+	font-size: 0.8125rem;
+	border-collapse: separate;
+	border-spacing: 0;
+	width: 100%;
+}
+
+.page-container[data-page-route="trial_balance"] .trial-balance-table thead th {
+	background: #fafafa;
+	color: var(--tb-muted);
+	font-weight: 600;
+	padding: 0.65rem 0.875rem;
+	border: none;
+	border-bottom: 1px solid var(--tb-border);
+	text-transform: uppercase;
+	font-size: 0.6875rem;
+	letter-spacing: 0.05em;
+	text-align: left;
+}
+
+.page-container[data-page-route="trial_balance"] .trial-balance-table thead th.text-right {
+	text-align: right;
+}
+
+.page-container[data-page-route="trial_balance"] .trial-balance-table tbody td {
+	padding: 0.65rem 0.875rem;
+	border: none;
+	border-bottom: 1px solid var(--tb-border);
+	vertical-align: middle;
+	color: var(--tb-text);
+}
+
+.page-container[data-page-route="trial_balance"] .trial-balance-table tbody tr {
+	transition: background 0.12s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.page-container[data-page-route="trial_balance"] .trial-balance-table tbody tr {
+		transition: none;
+	}
+}
+
+.page-container[data-page-route="trial_balance"] .trial-balance-table tbody tr:hover {
+	background: #fafafa;
+}
+
+.page-container[data-page-route="trial_balance"] .trial-balance-table .group-account {
+	background: #f4f4f5;
+	font-weight: 600;
+}
+
+.page-container[data-page-route="trial_balance"] .trial-balance-table .group-account td {
+	border-bottom-color: var(--tb-border-strong);
+}
+
+.page-container[data-page-route="trial_balance"] .trial-balance-table .text-right {
+	text-align: right;
+	font-family: var(--tb-mono);
+	font-variant-numeric: tabular-nums;
+}
+
+.page-container[data-page-route="trial_balance"] .trial-balance-table tfoot .total-row {
+	background: #fafafa;
+	color: var(--tb-text);
+	font-weight: 650;
+	border-top: 1px solid var(--tb-border);
+}
+
+.page-container[data-page-route="trial_balance"] .trial-balance-table tfoot .total-row th,
+.page-container[data-page-route="trial_balance"] .trial-balance-table tfoot .total-row td {
+	padding: 0.75rem 0.875rem;
+	border: none;
+	border-top: 1px solid var(--tb-border);
+	font-size: 0.8125rem;
+}
+
+/* Remove default bootstrap table borders inside our shell */
+.page-container[data-page-route="trial_balance"] .trial-balance-table.table-bordered,
+.page-container[data-page-route="trial_balance"] .trial-balance-table.table-bordered th,
+.page-container[data-page-route="trial_balance"] .trial-balance-table.table-bordered td {
+	border: none;
+}
+
+.page-container[data-page-route="trial_balance"] .trial-balance-table.table-bordered tbody td {
+	border-bottom: 1px solid var(--tb-border);
+}
+
+/* —— Loading —— */
+.page-container[data-page-route="trial_balance"] .tb-loading-spinner {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 2rem 1rem;
+	color: var(--tb-muted);
+	font-size: 0.875rem;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-spinner {
+	width: 1.125rem;
+	height: 1.125rem;
+	animation: tb-spin 0.7s linear infinite;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-spinner circle {
+	stroke: var(--tb-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.page-container[data-page-route="trial_balance"] .tb-spinner {
+		animation: none;
+	}
+}
+
+@keyframes tb-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.page-container[data-page-route="trial_balance"] .tb-text-center {
+	text-align: center;
+}
+
+.page-container[data-page-route="trial_balance"] .tb-text-danger {
+	color: var(--tb-danger);
+	font-size: 0.875rem;
+}
+
+/* —— Print —— */
+@media print {
+	.page-container[data-page-route="trial_balance"] .trial-balance-container .tb-page-header,
+	.page-container[data-page-route="trial_balance"] .trial-balance-container .tb-filters-section,
+	.page-container[data-page-route="trial_balance"] .trial-balance-container .tb-summary-section,
+	.page-container[data-page-route="trial_balance"] .trial-balance-container .tb-header-actions {
+		display: none !important;
+	}
+
+	.page-container[data-page-route="trial_balance"] .trial-balance-container .tb-table-section {
+		border: 1px solid #ccc;
+	}
+
+	.page-container[data-page-route="trial_balance"] .trial-balance-container .trial-balance-table {
+		font-size: 11px;
+	}
+
+	.page-container[data-page-route="trial_balance"] .trial-balance-container .trial-balance-table thead th {
+		background: #f0f0f0 !important;
+		color: #000 !important;
+	}
+
+	.page-container[data-page-route="trial_balance"] .trial-balance-container .trial-balance-table tfoot .total-row {
+		background: #f0f0f0 !important;
+		color: #000 !important;
+	}
+}
+
+@media (max-width: 768px) {
+	.page-container[data-page-route="trial_balance"] .tb-page-header {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.page-container[data-page-route="trial_balance"] .tb-header-actions {
+		justify-content: flex-start;
+	}
+
+	.page-container[data-page-route="trial_balance"] .tb-filters-section .row > div {
+		margin-bottom: 0.75rem;
+	}
+
+	.page-container[data-page-route="trial_balance"] .tb-stat-card {
+		margin-bottom: 0.75rem;
+	}
+
+	.page-container[data-page-route="trial_balance"] .table-responsive {
+		font-size: 0.75rem;
+	}
+
+	.page-container[data-page-route="trial_balance"] .trial-balance-table th,
+	.page-container[data-page-route="trial_balance"] .trial-balance-table td {
+		padding: 0.5rem 0.5rem;
+	}
+}

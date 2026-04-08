@@ -22,7 +22,8 @@
   "adr",
   "revpar",
   "section_break_dbgv",
-  "audit_notes"
+  "audit_notes",
+  "erpnext_journal_entry"
  ],
  "fields": [
   {
@@ -98,6 +99,14 @@
    "label": "Audit Notes"
   },
   {
+   "depends_on": "eval:doc.erpnext_journal_entry",
+   "fieldname": "erpnext_journal_entry",
+   "fieldtype": "Link",
+   "label": "ERPXpand Journal Entry",
+   "options": "Journal Entry",
+   "read_only": 1
+  },
+  {
    "fieldname": "column_break_yngx",
    "fieldtype": "Column Break"
   },
@@ -123,12 +132,15 @@
  "name": "Night Audit",
  "naming_rule": "Expression",
  "owner": "Administrator",
+ "is_submittable": 1,
  "permissions": [
   {
    "role": "System Manager",
    "read": 1,
    "write": 1,
    "create": 1,
+   "submit": 1,
+   "cancel": 1,
    "delete": 1,
    "email": 1,
    "export": 1,
@@ -141,6 +153,8 @@
    "read": 1,
    "write": 1,
    "create": 1,
+   "submit": 1,
+   "cancel": 1,
    "delete": 1,
    "email": 1,
    "export": 1,
@@ -153,6 +167,7 @@
    "read": 1,
    "write": 1,
    "create": 1,
+   "submit": 1,
    "email": 1,
    "export": 1,
    "print": 1,
@@ -164,6 +179,8 @@
    "read": 1,
    "write": 1,
    "create": 1,
+   "submit": 1,
+   "cancel": 1,
    "delete": 1,
    "email": 1,
    "export": 1,

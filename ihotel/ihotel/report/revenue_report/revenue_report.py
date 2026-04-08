@@ -75,8 +75,6 @@ def get_summary(filters, data):
     total_revenue = sum(flt(r.total_revenue) for r in data)
     adr = round(total_revenue / total_nights, 2) if total_nights else 0
 
-    total_rooms = flt(frappe.get_single("iHotel Settings").get("total_rooms") or 0)
-
     summary = [{
         "room_type": _("TOTAL"),
         "business_source": "",

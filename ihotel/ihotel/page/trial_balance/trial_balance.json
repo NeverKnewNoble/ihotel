@@ -1,0 +1,20 @@
+{
+ "content": null,
+ "creation": "2026-04-07 00:00:00",
+ "docstatus": 0,
+ "doctype": "Page",
+ "icon": "fa fa-balance-scale",
+ "idx": 0,
+ "modified": "2026-04-07 23:23:45.159420",
+ "modified_by": "Administrator",
+ "module": "iHotel",
+ "name": "trial_balance",
+ "owner": "Administrator",
+ "page_name": "trial_balance",
+ "roles": [],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0,
+ "title": "trial balance"
+}
