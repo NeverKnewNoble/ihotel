@@ -1,6 +1,6 @@
 {
  "app": "ihotel",
- "creation": "2026-04-08 14:44:20.476320",
+ "creation": "2026-04-09 22:56:00.595136",
  "docstatus": 0,
  "doctype": "Workspace Sidebar",
  "header_icon": "retail",
@@ -62,18 +62,6 @@
    "label": "Check In Profile",
    "link_to": "iHotel Profile",
    "link_type": "DocType",
-   "show_arrow": 0,
-   "type": "Link"
-  },
-  {
-   "child": 1,
-   "collapsible": 1,
-   "icon": "book-copy",
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Trial Balance",
-   "link_to": "trial_balance",
-   "link_type": "Page",
    "show_arrow": 0,
    "type": "Link"
   },
@@ -528,6 +516,18 @@
    "type": "Link"
   },
   {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "file-spreadsheet",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Trial Balance",
+   "link_to": "trial_balance",
+   "link_type": "Page",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
    "child": 0,
    "collapsible": 1,
    "icon": "list",
@@ -635,18 +635,6 @@
    "type": "Link"
   },
   {
-   "child": 1,
-   "collapsible": 1,
-   "icon": "badge-pound-sterling",
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Charge Type",
-   "link_to": "Charge Type",
-   "link_type": "DocType",
-   "show_arrow": 0,
-   "type": "Link"
-  },
-  {
    "child": 0,
    "collapsible": 1,
    "icon": "settings",
@@ -659,7 +647,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-04-08 14:46:06.316532",
+ "modified": "2026-04-10 08:57:37.395793",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "iHotel",

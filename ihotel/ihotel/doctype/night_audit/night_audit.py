@@ -325,16 +325,18 @@ class NightAudit(Document):
         Build a proper hotel Trial Balance for the audit date.
 
         Structure:
-          Section I  — Charges (Guest Ledger): all revenue posted today by charge type
-          Section II — Collections: cash & card payments received today
+          Section I  — Charges (Guest Ledger): folio charges + direct POS F&B revenue
+          Section II — Collections: front-desk cash/card + POS restaurant payments
           Section III — City Ledger: amounts transferred to corporate/AR accounts today
 
         Balance equation:
-          Guest Ledger Total = Collections + City Ledger + Net Outstanding
+          Total Revenue = Collections + City Ledger + Net Outstanding
         """
         audit_date = self.audit_date
 
-        # ── Section I: Revenue / Charges ─────────────────────────────────────
+        # ── Section I-A: Folio charges (room charges, charge-to-room F&B, etc.) ──
+        # These are charges posted to guest folios (iHotel Profile) — includes F&B
+        # that a guest charged to their room via the POS "Charge to Room" feature.
         revenue_rows = frappe.db.sql("""
             SELECT
                 fc.charge_type,
@@ -346,12 +348,39 @@ class NightAudit(Document):
             ORDER BY fc.charge_type
         """, {"date": audit_date}, as_dict=True)
 
-        # ── Section II: Cash & Card Collections ──────────────────────────────
+        # ── Section I-B: Direct POS F&B revenue (NOT charged to a room) ──────────
+        # POS invoices where the guest paid at the restaurant counter (cash/card)
+        # instead of charging to their hotel room. These never hit the folio system
+        # so they would otherwise be invisible on the trial balance. We pull them
+        # separately and merge them into the "Food & Beverage" bucket below.
+        pos_fnb_rows = _get_pos_direct_fnb(audit_date)
+        total_pos_fnb = sum(flt(r.total) for r in pos_fnb_rows)
+
+        # Merge POS direct F&B into the revenue rows under "Food & Beverage".
+        # If "Food & Beverage" already exists (from charge-to-room entries), add to it;
+        # otherwise create a new row for it.
+        if total_pos_fnb > 0:
+            fnb_row = next(
+                (r for r in revenue_rows if r.charge_type == "Food & Beverage"), None
+            )
+            if fnb_row:
+                fnb_row.total = round(flt(fnb_row.total) + total_pos_fnb, 2)
+            else:
+                revenue_rows.append(frappe._dict({
+                    "charge_type": "Food & Beverage",
+                    "total": round(total_pos_fnb, 2),
+                }))
+            # Re-sort so the list stays alphabetical
+            revenue_rows.sort(key=lambda r: r.charge_type or "")
+
+        # ── Section II: Cash & Card Collections ──────────────────────────────────
         # All payment methods EXCEPT City Ledger and Complimentary
         CASH_CARD_METHODS = (
             "Cash", "Visa", "Mastercard", "Amex",
             "Bank Transfer", "Cheque"
         )
+
+        # Front-desk collections (iHotel folio payments)
         collection_rows = frappe.db.sql("""
             SELECT
                 pi.payment_method,
@@ -364,7 +393,24 @@ class NightAudit(Document):
             ORDER BY pi.payment_method
         """, {"date": audit_date, "methods": CASH_CARD_METHODS}, as_dict=True)
 
-        # ── Complimentary (shown separately within collections) ───────────────
+        # POS restaurant collections — payments made directly at the POS counter
+        # for invoices that were NOT charged to a room. These represent real cash/card
+        # collected by the restaurant that must appear on the hotel's collections side.
+        pos_payment_rows = _get_pos_direct_payments(audit_date)
+
+        # Merge POS payments into collection_rows (add to existing method or append)
+        for pos_pay in pos_payment_rows:
+            existing = next(
+                (r for r in collection_rows if r.payment_method == pos_pay.payment_method),
+                None,
+            )
+            if existing:
+                existing.total = round(flt(existing.total) + flt(pos_pay.total), 2)
+            else:
+                collection_rows.append(pos_pay)
+        collection_rows.sort(key=lambda r: r.payment_method or "")
+
+        # ── Complimentary (shown separately within collections) ───────────────────
         comp_rows = frappe.db.sql("""
             SELECT
                 pi.payment_method,
@@ -376,7 +422,7 @@ class NightAudit(Document):
             GROUP BY pi.payment_method
         """, {"date": audit_date}, as_dict=True)
 
-        # ── Section III: City Ledger Transfers ────────────────────────────────
+        # ── Section III: City Ledger Transfers ────────────────────────────────────
         city_ledger_rows = frappe.db.sql("""
             SELECT
                 pi.payment_method,
@@ -388,7 +434,7 @@ class NightAudit(Document):
             GROUP BY pi.payment_method
         """, {"date": audit_date}, as_dict=True)
 
-        # ── Outstanding open folio balances (in-house guests) ────────────────
+        # ── Outstanding open folio balances (in-house guests) ────────────────────
         outstanding_rows = frappe.db.sql("""
             SELECT
                 p.name AS profile,
@@ -401,15 +447,15 @@ class NightAudit(Document):
             ORDER BY p.room
         """, as_dict=True)
 
-        # ── Totals ────────────────────────────────────────────────────────────
-        total_charges      = sum(r.total or 0 for r in revenue_rows)
-        total_collections  = sum(r.total or 0 for r in collection_rows)
-        total_complimentary = sum(r.total or 0 for r in comp_rows)
-        total_city_ledger  = sum(r.total or 0 for r in city_ledger_rows)
-        total_outstanding  = sum(r.outstanding_balance or 0 for r in outstanding_rows)
+        # ── Totals ────────────────────────────────────────────────────────────────
+        total_charges       = sum(flt(r.total) for r in revenue_rows)
+        total_collections   = sum(flt(r.total) for r in collection_rows)
+        total_complimentary = sum(flt(r.total) for r in comp_rows)
+        total_city_ledger   = sum(flt(r.total) for r in city_ledger_rows)
+        total_outstanding   = sum(flt(r.outstanding_balance) for r in outstanding_rows)
 
-        # Net balance check: charges should equal collections + city ledger + outstanding
-        # (small float differences are normal; this is the reconciliation figure)
+        # Reconciliation: total revenue should equal all the ways it was settled.
+        # A non-zero difference flags a gap the auditor needs to investigate.
         balance_difference = round(
             total_charges - total_collections - total_complimentary - total_city_ledger,
             2
@@ -417,15 +463,18 @@ class NightAudit(Document):
 
         return {
             "audit_date":           str(audit_date),
-            # Section I
+            # Section I — Revenue
             "charges":              revenue_rows,
             "total_charges":        round(total_charges, 2),
-            # Section II
+            # POS F&B breakdown (informational — already included in charges above)
+            "pos_fnb_breakdown":    pos_fnb_rows,
+            "total_pos_fnb":        round(total_pos_fnb, 2),
+            # Section II — Collections
             "collections":          collection_rows,
             "complimentary":        comp_rows,
             "total_collections":    round(total_collections, 2),
             "total_complimentary":  round(total_complimentary, 2),
-            # Section III
+            # Section III — City Ledger
             "city_ledger":          city_ledger_rows,
             "total_city_ledger":    round(total_city_ledger, 2),
             # Outstanding (in-house)
@@ -462,3 +511,102 @@ class NightAudit(Document):
             "adr": self.adr,
             "revpar": self.revpar,
         }
+
+
+# ── Module-level helpers for POS F&B integration ─────────────────────────────
+
+def _get_pos_direct_fnb(audit_date):
+    """
+    Return F&B revenue from POS Invoices that were paid directly at the restaurant
+    (NOT charged to a hotel room). Grouped by restaurant so the auditor can see
+    which outlet contributed how much.
+
+    We exclude charge-to-room invoices (custom_charge_to_room = 1) because those
+    are already on the folio as a Folio Charge row — including them here would
+    double-count them.
+
+    Returns a list of dicts: [{charge_type, restaurant, total}, ...]
+    The charge_type is always "Food & Beverage" so it merges cleanly into Section I.
+    """
+    if not frappe.db.exists("DocType", "POS Invoice"):
+        # POS module not installed — nothing to pull
+        return []
+
+    # Check whether the custom field exists before filtering on it to avoid SQL errors
+    # on installs that don't have the iHotel–POS bridge fields.
+    meta = frappe.get_meta("POS Invoice")
+    has_ctr_field = meta.has_field("custom_charge_to_room")
+
+    if has_ctr_field:
+        rows = frappe.db.sql("""
+            SELECT
+                'Food & Beverage'       AS charge_type,
+                IFNULL(pi.restaurant, pi.pos_profile) AS restaurant,
+                SUM(pi.net_total)       AS total
+            FROM `tabPOS Invoice` pi
+            WHERE pi.docstatus = 1
+              AND DATE(pi.posting_date) = %(date)s
+              AND (pi.custom_charge_to_room IS NULL OR pi.custom_charge_to_room = 0)
+            GROUP BY restaurant
+            ORDER BY restaurant
+        """, {"date": audit_date}, as_dict=True)
+    else:
+        # No charge-to-room field — treat all POS invoices as direct F&B
+        rows = frappe.db.sql("""
+            SELECT
+                'Food & Beverage'       AS charge_type,
+                IFNULL(pi.restaurant, pi.pos_profile) AS restaurant,
+                SUM(pi.net_total)       AS total
+            FROM `tabPOS Invoice` pi
+            WHERE pi.docstatus = 1
+              AND DATE(pi.posting_date) = %(date)s
+            GROUP BY restaurant
+            ORDER BY restaurant
+        """, {"date": audit_date}, as_dict=True)
+
+    return rows
+
+
+def _get_pos_direct_payments(audit_date):
+    """
+    Return payment method totals from POS Invoices that were paid at the restaurant
+    counter (NOT charged to a room). These represent real cash/card collected by
+    the restaurant outlet that must appear in the hotel's collections section.
+
+    Returns a list of dicts: [{payment_method, total}, ...]
+    compatible with the folio collection_rows format.
+    """
+    if not frappe.db.exists("DocType", "POS Invoice"):
+        return []
+
+    meta = frappe.get_meta("POS Invoice")
+    has_ctr_field = meta.has_field("custom_charge_to_room")
+
+    if has_ctr_field:
+        rows = frappe.db.sql("""
+            SELECT
+                sip.mode_of_payment    AS payment_method,
+                SUM(sip.amount)        AS total
+            FROM `tabPOS Invoice` pi
+            INNER JOIN `tabSales Invoice Payment` sip ON sip.parent = pi.name
+            WHERE pi.docstatus = 1
+              AND DATE(pi.posting_date) = %(date)s
+              AND (pi.custom_charge_to_room IS NULL OR pi.custom_charge_to_room = 0)
+              AND sip.mode_of_payment != 'Room Charge'
+            GROUP BY sip.mode_of_payment
+            ORDER BY sip.mode_of_payment
+        """, {"date": audit_date}, as_dict=True)
+    else:
+        rows = frappe.db.sql("""
+            SELECT
+                sip.mode_of_payment    AS payment_method,
+                SUM(sip.amount)        AS total
+            FROM `tabPOS Invoice` pi
+            INNER JOIN `tabSales Invoice Payment` sip ON sip.parent = pi.name
+            WHERE pi.docstatus = 1
+              AND DATE(pi.posting_date) = %(date)s
+            GROUP BY sip.mode_of_payment
+            ORDER BY sip.mode_of_payment
+        """, {"date": audit_date}, as_dict=True)
+
+    return rows
