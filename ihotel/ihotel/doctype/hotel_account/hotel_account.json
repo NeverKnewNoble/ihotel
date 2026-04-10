@@ -11,7 +11,6 @@
   "account_code",
   "section_break_type",
   "account_type",
-  "folio_charge_types",
   "column_break_type2",
   "is_group",
   "section_break_parent",
@@ -51,12 +50,6 @@
    "label": "Account Type",
    "options": "\nRevenue\nPayment\nCity Ledger\nAsset\nLiability\nEquity\nExpense",
    "reqd": 1
-  },
-  {
-   "description": "Comma-separated Folio Charge types (e.g. Room Charge) for lines with no Hotel Account set. Use one leaf account per type to avoid double counting.",
-   "fieldname": "folio_charge_types",
-   "fieldtype": "Small Text",
-   "label": "Folio charge types"
   },
   {
    "fieldname": "column_break_type2",

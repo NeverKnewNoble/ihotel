@@ -3,7 +3,7 @@ from frappe.utils import getdate, flt, formatdate
 from datetime import datetime, timedelta
 import json
 
-from ihotel.ihotel.doctype.hotel_account.hotel_account import parse_folio_charge_types
+from ihotel.ihotel.doctype.charge_type.charge_type import resolve_hotel_account_for_charge_type
 
 @frappe.whitelist()
 def get_trial_balance_data(filters=None):
@@ -67,44 +67,31 @@ def get_trial_balance_data(filters=None):
 
 def _folio_amount_for_hotel_account(account_name, from_date, to_date):
     """
-    Sum Folio Charge amounts for this Hotel Account.
+    Sum Folio Charge amounts that map to this Hotel Account through Charge Type configuration.
     Folio rows live on iHotel Profile; join through Checked In (submitted stays only).
-    Match: explicit fc.hotel_account, OR empty hotel_account + charge_type listed on the Hotel Account.
     """
-    types_csv = frappe.db.get_value("Hotel Account", account_name, "folio_charge_types")
-    types = parse_folio_charge_types(types_csv)
-
-    base = """
+    rows = frappe.db.sql(
+        """
+        SELECT
+            fc.charge_type,
+            COALESCE(SUM(fc.amount), 0) AS total
         FROM `tabFolio Charge` fc
         INNER JOIN `tabiHotel Profile` p ON p.name = fc.parent
         INNER JOIN `tabChecked In` ci ON ci.name = p.hotel_stay AND ci.docstatus = 1
         WHERE fc.charge_date BETWEEN %s AND %s
-    """
+        GROUP BY fc.charge_type
+        """,
+        (from_date, to_date),
+        as_dict=True,
+    )
 
-    if types:
-        placeholders = ", ".join(["%s"] * len(types))
-        sql = f"""
-            SELECT COALESCE(SUM(fc.amount), 0) AS total
-            {base}
-            AND (
-                fc.hotel_account = %s
-                OR (
-                    IFNULL(fc.hotel_account, '') = ''
-                    AND fc.charge_type IN ({placeholders})
-                )
-            )
-        """
-        params = tuple([from_date, to_date, account_name, *types])
-    else:
-        sql = f"""
-            SELECT COALESCE(SUM(fc.amount), 0) AS total
-            {base}
-            AND fc.hotel_account = %s
-        """
-        params = (from_date, to_date, account_name)
+    gross = 0.0
+    for row in rows:
+        mapped_account = resolve_hotel_account_for_charge_type(row.charge_type)
+        if mapped_account == account_name:
+            gross += flt(row.total)
 
-    row = frappe.db.sql(sql, params, as_dict=True)
-    return flt(row[0].total if row else 0)
+    return flt(gross)
 
 
 def _debit_credit_from_amount(account_type, amount):

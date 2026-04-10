@@ -592,10 +592,14 @@ class CheckedIn(Document):
             self.db_set("profile", existing, update_modified=False)
             return
 
+        # Set room and guest explicitly: fetch_from does not reliably persist on programmatic insert,
+        # and POS / reports join folio to Room via p.room (must be stored).
         profile = frappe.get_doc({
             "doctype": "iHotel Profile",
             "hotel_stay": self.name,
             "status": "Open",
+            "room": self.room,
+            "guest": self.guest,
         })
         profile.insert(ignore_permissions=True)
         self.db_set("profile", profile.name, update_modified=False)

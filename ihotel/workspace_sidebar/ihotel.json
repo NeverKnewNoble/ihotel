@@ -1,6 +1,6 @@
 {
  "app": "ihotel",
- "creation": "2026-04-08 01:24:20.573058",
+ "creation": "2026-04-08 14:44:20.476320",
  "docstatus": 0,
  "doctype": "Workspace Sidebar",
  "header_icon": "retail",
@@ -635,6 +635,18 @@
    "type": "Link"
   },
   {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "badge-pound-sterling",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Charge Type",
+   "link_to": "Charge Type",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
    "child": 0,
    "collapsible": 1,
    "icon": "settings",
@@ -647,7 +659,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-04-08 01:36:12.826806",
+ "modified": "2026-04-08 14:46:06.316532",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "iHotel",
