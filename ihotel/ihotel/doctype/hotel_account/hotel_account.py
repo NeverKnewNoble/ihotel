@@ -6,30 +6,6 @@ from frappe.model.document import Document
 from frappe import _
 
 
-def parse_folio_charge_types(value):
-    """Split stored Folio charge type list (comma or newline separated)."""
-    if not value:
-        return []
-    return [t.strip() for t in str(value).replace("\n", ",").split(",") if t.strip()]
-
-
-def resolve_hotel_account_for_charge_type(charge_type):
-    """First non-group Hotel Account whose Folio charge types include this charge_type."""
-    if not charge_type:
-        return None
-    rows = frappe.db.sql(
-        """
-        SELECT name, folio_charge_types FROM `tabHotel Account`
-        WHERE IFNULL(is_group, 0) = 0
-        """,
-        as_dict=True,
-    )
-    for row in rows:
-        if charge_type in parse_folio_charge_types(row.folio_charge_types):
-            return row.name
-    return None
-
-
 class HotelAccount(Document):
     def validate(self):
         self.validate_parent()

@@ -5,6 +5,8 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils import flt, nowdate
 
+from ihotel.ihotel.doctype.charge_type.charge_type import ensure_default_charge_types
+
 
 class iHotelProfile(Document):
 	def validate(self):
@@ -24,9 +26,17 @@ class iHotelProfile(Document):
 		)
 
 	def update_status(self):
-		"""Auto-set status to Settled when fully paid."""
+		"""Auto-manage status based on outstanding balance.
+
+		Open   → Settled  : balance is zero or negative and there are charges.
+		Settled → Open    : new charges have made the balance positive again
+		                    (e.g. an F&B charge was added after a full deposit).
+		Transferred / Closed are never overridden here.
+		"""
 		if self.status == "Open" and self.outstanding_balance <= 0 and self.total_amount > 0:
 			self.status = "Settled"
+		elif self.status == "Settled" and self.outstanding_balance > 0:
+			self.status = "Open"
 
 	def on_trash(self):
 		"""Break the back-reference in Checked In before Frappe's link-check runs."""
@@ -40,6 +50,7 @@ class iHotelProfile(Document):
 	def post_charge(self, charge_type, description, rate, quantity=1,
 	                reference_doctype=None, reference_name=None):
 		"""Append a charge line to this folio and save."""
+		ensure_default_charge_types()
 		self.append("charges", {
 			"charge_date": nowdate(),
 			"charge_type": charge_type,

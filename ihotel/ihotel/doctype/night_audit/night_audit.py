@@ -11,7 +11,7 @@ from frappe import _
 from datetime import datetime, date
 from frappe.utils import getdate, flt
 
-from ihotel.ihotel.doctype.hotel_account.hotel_account import resolve_hotel_account_for_charge_type
+from ihotel.ihotel.doctype.charge_type.charge_type import resolve_hotel_account_for_charge_type
 
 class NightAudit(Document):
     def validate(self):
@@ -148,13 +148,12 @@ class NightAudit(Document):
         if already_posted:
             return
 
-        # Tie folio line to Trial Balance Hotel Account when configured (folio_charge_types on Hotel Account).
-        room_hotel_account = resolve_hotel_account_for_charge_type("Room Charge")
+        # Resolve mapping so configuration can be validated early by lookup.
+        resolve_hotel_account_for_charge_type("Room Charge")
 
         profile_doc.append("charges", {
             "charge_date": audit_date,
             "charge_type": "Room Charge",
-            "hotel_account": room_hotel_account,
             "description": _("Nightly room charge — Room {0} ({1})").format(
                 stay_doc.room or "", audit_date
             ),

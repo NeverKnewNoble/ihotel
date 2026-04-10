@@ -7,7 +7,6 @@
  "field_order": [
   "charge_date",
   "charge_type",
-  "hotel_account",
   "description",
   "quantity",
   "rate",
@@ -28,19 +27,11 @@
   },
   {
    "fieldname": "charge_type",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "label": "Charge Type",
-   "options": "Room Charge\nFood & Beverage\nLaundry\nMinibar\nTelephone\nSpa\nTransport\nParking\nAdditional Service\nOther",
-   "reqd": 1
-  },
-  {
-   "description": "Trial Balance bucket; night audit sets this when a matching Hotel Account maps the charge type.",
-   "fieldname": "hotel_account",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Hotel Account",
-   "options": "Hotel Account"
+   "label": "Charge Type",
+   "options": "Charge Type",
+   "reqd": 1
   },
   {
    "fieldname": "description",
