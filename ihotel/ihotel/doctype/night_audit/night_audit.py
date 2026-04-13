@@ -8,10 +8,36 @@
 import frappe
 from frappe.model.document import Document
 from frappe import _
-from datetime import datetime, date
 from frappe.utils import getdate, flt
 
 from ihotel.ihotel.doctype.charge_type.charge_type import resolve_hotel_account_for_charge_type
+
+
+def get_stays_in_house_on(audit_date):
+    """
+    Point-in-time occupancy: submitted stays physically in-house on audit_date.
+
+    Uses actual check-in/out when set, otherwise expected. Includes Checked Out so
+    back-dated night audits still see guests who have since departed. Excludes
+    Reserved / No Show / Cancelled so room charges are not posted for non-stays.
+
+    Overlap rule (same as legacy night audit): arrival date <= audit_date < departure date.
+    """
+    d = getdate(audit_date)
+    return frappe.db.sql(
+        """
+        SELECT name, room_rate
+        FROM `tabChecked In`
+        WHERE status IN ('Checked In', 'Checked Out')
+        AND docstatus = 1
+        AND room IS NOT NULL AND room != ''
+        AND DATE(COALESCE(actual_check_in, expected_check_in)) <= %(date)s
+        AND DATE(COALESCE(actual_check_out, expected_check_out)) > %(date)s
+        """,
+        {"date": d},
+        as_dict=True,
+    )
+
 
 class NightAudit(Document):
     def validate(self):
@@ -33,15 +59,7 @@ class NightAudit(Document):
         """
         self.total_rooms = frappe.db.count("Room") or 0
 
-        audit_date = self.audit_date
-        occupied_stays = frappe.db.sql("""
-            SELECT name, room_rate
-            FROM `tabChecked In`
-            WHERE status = 'Checked In'
-            AND docstatus = 1
-            AND DATE(expected_check_in) <= %(date)s
-            AND DATE(expected_check_out) > %(date)s
-        """, {"date": audit_date}, as_dict=True)
+        occupied_stays = get_stays_in_house_on(self.audit_date)
 
         self.occupied_rooms = len(occupied_stays)
 
@@ -72,12 +90,6 @@ class NightAudit(Document):
         self.run_night_audit()
         self._post_erpnext_journal_for_night_audit()
 
-    def after_insert(self):
-        """
-        Night audit should also run as soon as the document is created.
-        """
-        self.run_night_audit()
-
     def run_night_audit(self):
         """
         Post one nightly room charge per guest who is in-house on the audit date.
@@ -85,21 +97,19 @@ class NightAudit(Document):
         The charge is posted with the audit date, not the current date.
         """
         audit_date = self.audit_date
-
-        in_house_stays = frappe.db.sql("""
-            SELECT name FROM `tabChecked In`
-            WHERE status = 'Checked In'
-            AND docstatus = 1
-            AND DATE(expected_check_in) <= %(date)s
-            AND DATE(expected_check_out) > %(date)s
-        """, {"date": audit_date}, as_dict=True)
+        in_house_stays = get_stays_in_house_on(audit_date)
+        today = getdate(frappe.utils.today())
 
         for stay in in_house_stays:
             stay_doc = frappe.get_doc("Checked In", stay.name)
             profile_doc = self.ensure_profile_for_stay(stay_doc)
             self.add_payment_entry(profile_doc, stay_doc)
-            # Mark room as Occupied Dirty for housekeeping
-            if stay_doc.room:
+            # Housekeeping: only for today's audit and still in-house (skip backfill / checked-out)
+            if (
+                stay_doc.room
+                and stay_doc.status == "Checked In"
+                and getdate(audit_date) == today
+            ):
                 frappe.db.set_value("Room", stay_doc.room, "status", "Occupied Dirty")
 
     def ensure_profile_for_stay(self, stay_doc):
@@ -195,17 +205,7 @@ class NightAudit(Document):
             return
 
         audit_date = self.audit_date
-        rows = frappe.db.sql(
-            """
-            SELECT name FROM `tabChecked In`
-            WHERE status = 'Checked In'
-            AND docstatus = 1
-            AND DATE(expected_check_in) <= %(date)s
-            AND DATE(expected_check_out) > %(date)s
-            """,
-            {"date": audit_date},
-            as_dict=True,
-        )
+        rows = get_stays_in_house_on(audit_date)
 
         total_credit = 0.0
         debit_entries = []
