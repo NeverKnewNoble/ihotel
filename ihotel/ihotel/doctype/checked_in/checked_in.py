@@ -1005,13 +1005,15 @@ class CheckedIn(Document):
 
         guest_phone = frappe.db.get_value("Guest", self.guest, "phone") if self.guest else None
         try:
+            mobile = str(guest_phone) if guest_phone else None
             cust = frappe.get_doc({
                 "doctype": "Customer",
                 "customer_name": guest_name,
                 "customer_type": "Individual",
                 "customer_group": _resolve_default_customer_group(settings),
                 "territory": settings.get("default_territory") or "All Territories",
-                "mobile_no": guest_phone,
+                "mobile_no": mobile,
+                "mobile_number": mobile,
             })
             # Bypass used here because checkout / night-audit may run as a system user
             # that lacks Customer create rights. Actor logged for audit trail.
