@@ -50,31 +50,7 @@
 	}
 
 	function openNotificationsPanel() {
-		const deferOpen = (fn) => {
-			setTimeout(fn, 0);
-			return true;
-		};
-
-		// Primary path for Desk sidebar notifications modal/panel.
-		if (frappe.app?.sidebar?.wrapper) {
-			return deferOpen(() => {
-				const sidebar = frappe.app.sidebar;
-				if (typeof sidebar.open === "function") {
-					sidebar.open();
-				}
-				const $dropdown = sidebar.wrapper.find(".dropdown-notifications");
-				if ($dropdown.length) {
-					$dropdown.removeClass("hidden");
-					return;
-				}
-				const $sidebarButton = sidebar.wrapper.find(".sidebar-notification");
-				if ($sidebarButton.length) {
-					$sidebarButton.trigger("click");
-				}
-			});
-		}
-
-		// Try framework-level API first if available.
+		// Primary path: stable Frappe toolbar APIs (version-resilient)
 		if (frappe.ui?.toolbar?.show_notifications && typeof frappe.ui.toolbar.show_notifications === "function") {
 			frappe.ui.toolbar.show_notifications();
 			return true;
@@ -88,57 +64,32 @@
 			return true;
 		}
 
-		// Fallbacks for common Desk/navbar/sidebar notification triggers.
-		const opened = clickBySelectors([
-			".dropdown-notifications .dropdown-toggle",
-			".dropdown-notifications .notifications-icon",
-			".navbar .notifications-icon",
-			".notification-icon",
-			".navbar .dropdown-notifications > a",
-			".standard-sidebar .item-anchor[title='Notifications']",
-			".standard-sidebar .item-anchor[data-title='Notifications']",
-			".standard-sidebar .standard-sidebar-item[title='Notifications']",
-			".standard-sidebar .standard-sidebar-item[data-label='Notifications']",
-			".layout-side-section [title='Notifications']",
-			".layout-side-section [data-label='Notifications']",
-			"[aria-label='Notifications']",
-			"[data-original-title='Notifications']",
-			"[title='Notifications']",
-			"a[href*='notifications']",
-		]);
-		if (opened) return true;
-
-		// Fallback via Bootstrap/jQuery dropdown API (used in some Desk versions).
-		if (window.jQuery) {
-			const $toggle = window.jQuery(".dropdown-notifications .dropdown-toggle, .navbar .dropdown-notifications > a").first();
-			if ($toggle.length) {
-				if (typeof $toggle.dropdown === "function") $toggle.dropdown("toggle");
-				else $toggle.trigger("click");
-				return true;
-			}
-		}
-
-		const notificationLabel = __("Notifications");
-		const clickableNodes = Array.from(document.querySelectorAll("a, button, [role='button'], .standard-sidebar-item, .item-anchor"));
-		const notificationsNode = clickableNodes.find((node) => node.textContent?.trim() === notificationLabel || node.textContent?.trim() === "Notifications");
-		if (notificationsNode) {
-			notificationsNode.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-			notificationsNode.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-			notificationsNode.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-			const href = notificationsNode.getAttribute?.("href");
-			if (href && frappe.set_route) {
-				const cleaned = href.replace(/^#/, "");
-				if (cleaned) frappe.set_route(cleaned);
-			}
+		// Secondary path: sidebar wrapper API (present in some Desk builds)
+		if (frappe.app?.sidebar?.wrapper) {
+			setTimeout(() => {
+				const sidebar = frappe.app.sidebar;
+				if (typeof sidebar.open === "function") sidebar.open();
+				const $btn = sidebar.wrapper.find(".sidebar-notification, .dropdown-notifications");
+				if ($btn.length) $btn.first().trigger("click");
+			}, 0);
 			return true;
 		}
 
-		// Never fail silently: route to Notification Log list as a last fallback.
+		// Tertiary path: single well-known selector (more stable than a long cascade)
+		const el = document.querySelector("[data-label='Notifications'], [aria-label='Notifications'], .dropdown-notifications .dropdown-toggle");
+		if (el) {
+			el.click();
+			return true;
+		}
+
+		// Final fallback: navigate to Notification Log list view — always available
 		if (frappe.set_route) {
 			frappe.set_route("List", "Notification Log");
 			return true;
 		}
 
+		// Log failed open attempt for debugging (visible in browser console only)
+		console.warn("[iHotel] openNotificationsPanel: no viable path found to open notifications.");
 		return false;
 	}
 

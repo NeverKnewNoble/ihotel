@@ -9,6 +9,34 @@ import random
 import string
 
 
+def _is_valid_card_expiry(expiry):
+	"""Return True if expiry matches MM/YY format and is not obviously in the past."""
+	import re
+	if not re.match(r"^\d{2}/\d{2}$", str(expiry or "")):
+		return False
+	try:
+		month, year = int(expiry[:2]), int(expiry[3:])
+		if not (1 <= month <= 12):
+			return False
+		from frappe.utils import getdate
+		from datetime import date
+		today = date.today()
+		full_year = 2000 + year
+		# Allow cards that expire this month
+		return (full_year, month) >= (today.year, today.month)
+	except Exception:
+		return False
+
+
+def _resolve_default_customer_group(settings):
+	"""Return a safe non-group customer group for auto-created customers."""
+	group = settings.get("default_customer_group") or "Individual Customer"
+	if frappe.db.get_value("Customer Group", group, "is_group"):
+		fallback = frappe.db.get_value("Customer Group", {"is_group": 0}, "name")
+		return fallback or group
+	return group
+
+
 class Reservation(Document):
 	def validate(self):
 		self.validate_restricted_guest()
@@ -192,14 +220,57 @@ class Reservation(Document):
 			self.cancellation_fee = 0
 
 	def validate_payment_method(self):
-		"""Require card details when payment method is Credit Card.
-		Direct Bill is restricted to Company guarantee type only."""
-		if self.payment_method in ("Visa", "Mastercard", "Amex", "Credit Card"):
+		"""Validate payment method details.
+
+		Hard-blocks: structurally impossible combinations (e.g. Direct Bill without Company guarantee).
+		Soft-warnings: missing-but-recoverable details (card last4, expiry, cheque fields).
+		Warnings use msgprint so staff are informed without being blocked mid-shift.
+		"""
+		pm = self.payment_method or ""
+		warnings = []
+
+		if pm in ("Visa", "Mastercard", "Amex", "Credit Card"):
 			if not self.credit_card_type:
-				frappe.throw(_("Please specify the Credit Card Type for payment method {0}.").format(
-					self.payment_method))
-		if self.payment_method == "Direct Bill" and self.guarantee_type != "Company":
-			frappe.throw(_("Direct Bill payment requires Guarantee Type to be set to Company."))
+				frappe.throw(_("Please specify the Credit Card Type for payment method {0}.").format(pm))
+			# Soft-warn on incomplete card capture
+			if not self.credit_card_last4:
+				warnings.append(_("Card last 4 digits are missing — recommended for reconciliation."))
+			elif not str(self.credit_card_last4).isdigit() or len(str(self.credit_card_last4)) != 4:
+				warnings.append(_("Card last 4 digits should be exactly 4 numeric digits."))
+			if not self.card_expiry:
+				warnings.append(_("Card expiry (MM/YY) is missing — recommended for chargeback protection."))
+			elif not _is_valid_card_expiry(self.card_expiry):
+				warnings.append(_("Card expiry format should be MM/YY (e.g. 08/27)."))
+
+		elif pm == "Cheque":
+			if not self.cheque_number:
+				warnings.append(_("Cheque number is missing."))
+			if not self.date_of_the_cheque:
+				warnings.append(_("Cheque date is missing."))
+			if not self.bank_name:
+				warnings.append(_("Bank name is missing."))
+			if not self.cheque_amount or float(self.cheque_amount or 0) <= 0:
+				warnings.append(_("Cheque amount should be greater than zero."))
+
+		elif pm == "Direct Bill":
+			# Hard-block: Direct Bill requires Company guarantee
+			if self.guarantee_type != "Company":
+				frappe.throw(_("Direct Bill payment requires Guarantee Type to be set to Company."))
+			# Soft-warn if no customer linked
+			if not self.customer_id:
+				warnings.append(_("Direct Bill selected but no Customer ID is linked — required for city-ledger billing."))
+
+		if warnings:
+			# When strict mode is enabled in iHotel Settings, block on incomplete payment details.
+			# Default is soft-warning to avoid disrupting fast check-in flows.
+			strict = frappe.db.get_single_value("iHotel Settings", "strict_payment_validation")
+			msg = _("Payment details incomplete — please review before confirming:<br><ul>{0}</ul>").format(
+				"".join(f"<li>{w}</li>" for w in warnings)
+			)
+			if strict:
+				frappe.throw(msg, title=_("Payment Details Required"))
+			else:
+				frappe.msgprint(msg, title=_("Payment Details Warning"), indicator="orange")
 
 	def sync_guest_details(self):
 		"""If a Guest profile is selected, auto-fill contact fields."""
@@ -216,7 +287,10 @@ class Reservation(Document):
 
 @frappe.whitelist()
 def create_proforma_invoice(reservation_name):
-	"""Create a draft Sales Invoice (proforma) for the reservation."""
+	"""Create a draft Sales Invoice (proforma) for the reservation.
+	Requires write access to the Reservation. Permission-bypass inserts are logged with actor.
+	"""
+	frappe.has_permission("Reservation", "write", reservation_name, throw=True)
 	res = frappe.get_doc("Reservation", reservation_name)
 
 	if res.proforma_invoice:
@@ -253,7 +327,7 @@ def create_proforma_invoice(reservation_name):
 				"doctype": "Customer",
 				"customer_name": guest_name,
 				"customer_type": "Individual",
-				"customer_group": settings.default_customer_group or "All Customer Groups",
+				"customer_group": _resolve_default_customer_group(settings),
 				"territory": settings.default_territory or "All Territories",
 				"mobile_no": guest_phone,
 			})
@@ -340,6 +414,7 @@ def create_proforma_invoice(reservation_name):
 
 @frappe.whitelist()
 def convert_to_hotel_stay(reservation_name):
+	frappe.has_permission("Reservation", "write", reservation_name, throw=True)
 	reservation = frappe.get_doc("Reservation", reservation_name)
 
 	if reservation.status == "cancelled":
@@ -448,11 +523,24 @@ def convert_to_hotel_stay(reservation_name):
 		"deposit_method":       deposit_method or "",
 		"payment_detail":       payment_detail,
 		"rate_lines":           rate_lines,
+		# Propagate no_post so night audit and folio respect the billing block
+		"no_post":              reservation.no_post or 0,
 	})
 	hotel_stay.insert(ignore_permissions=True)
-	hotel_stay.submit()
 
-	# Link back to the guest profile
+	# Submit the stay. On submit failure, cancel and delete the draft to avoid orphan records.
+	try:
+		hotel_stay.submit()
+	except Exception as submit_err:
+		try:
+			frappe.delete_doc("Checked In", hotel_stay.name, ignore_permissions=True, force=True)
+		except Exception:
+			pass
+		frappe.throw(
+			_("Failed to activate check-in record. Rolled back. Error: {0}").format(str(submit_err))
+		)
+
+	# Link back to the guest profile and mark reservation as checked in
 	if guest:
 		reservation.db_set("guest", guest)
 

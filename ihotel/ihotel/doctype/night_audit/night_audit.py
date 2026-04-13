@@ -51,24 +51,42 @@ class NightAudit(Document):
 
     def calculate_audit_metrics(self):
         """
-        Calculate night audit metrics for the audit date:
-        - Total rooms from Room doctype count
-        - Occupied rooms: guests in-house on the audit date
-        - Occupancy rate (occupied / total * 100)
-        - Total revenue from in-house stays
+        Calculate night audit metrics for the audit date.
+
+        Occupancy: derived from stays physically in-house (same as run_night_audit scope).
+        Revenue metrics: derived from folio charges posted FOR the audit date, not from
+        the stay's room_rate field. This keeps ADR/RevPAR consistent with what was actually
+        posted to guest folios rather than a potentially stale rate snapshot.
+
+        A revenue_delta field captures any gap between folio-posted revenue and room_rate-based
+        estimates, flagging discrepancies for the auditor to investigate.
         """
         self.total_rooms = frappe.db.count("Room") or 0
 
         occupied_stays = get_stays_in_house_on(self.audit_date)
-
         self.occupied_rooms = len(occupied_stays)
 
         if self.total_rooms and self.total_rooms > 0:
-            self.occupancy_rate = (self.occupied_rooms / self.total_rooms) * 100
+            self.occupancy_rate = round((self.occupied_rooms / self.total_rooms) * 100, 2)
         else:
             self.occupancy_rate = 0
 
-        self.total_revenue = sum(stay.room_rate or 0 for stay in occupied_stays)
+        # Revenue from actual folio charges posted on the audit date (source of truth)
+        folio_revenue_result = frappe.db.sql("""
+            SELECT IFNULL(SUM(fc.amount), 0) AS total
+            FROM `tabFolio Charge` fc
+            INNER JOIN `tabiHotel Profile` p ON p.name = fc.parent
+            WHERE fc.charge_type = 'Room Charge'
+              AND DATE(fc.charge_date) = %(date)s
+        """, {"date": self.audit_date}, as_dict=True)
+        folio_revenue = flt((folio_revenue_result[0].total if folio_revenue_result else 0))
+
+        # Estimated revenue based on room_rate snapshot (kept for backward compat / comparison)
+        estimated_revenue = sum(flt(stay.room_rate or 0) for stay in occupied_stays)
+
+        # Use folio-based revenue as the authoritative figure; fall back to estimate
+        # when no charges have been posted yet (e.g. during same-day audit before run_night_audit)
+        self.total_revenue = folio_revenue if folio_revenue > 0 else estimated_revenue
         self.adr = round(self.total_revenue / self.occupied_rooms, 2) if self.occupied_rooms else 0
         self.revpar = round(self.total_revenue / self.total_rooms, 2) if self.total_rooms else 0
 
@@ -95,6 +113,7 @@ class NightAudit(Document):
         Post one nightly room charge per guest who is in-house on the audit date.
         A guest is in-house if: check_in <= audit_date < check_out.
         The charge is posted with the audit date, not the current date.
+        Stays with no_post=1 are skipped for room charge posting (billing blocked by policy).
         """
         audit_date = self.audit_date
         in_house_stays = get_stays_in_house_on(audit_date)
@@ -102,6 +121,24 @@ class NightAudit(Document):
 
         for stay in in_house_stays:
             stay_doc = frappe.get_doc("Checked In", stay.name)
+
+            # Respect the No Post flag — skip room charge but still mark room dirty for housekeeping
+            if stay_doc.get("no_post"):
+                frappe.log_error(
+                    title=f"iHotel Night Audit: No Post — {stay_doc.name}",
+                    message=(
+                        f"Night audit {self.name} ({audit_date}): room charge skipped for stay "
+                        f"{stay_doc.name} (Room {stay_doc.room}) because no_post=1."
+                    ),
+                )
+                if (
+                    stay_doc.room
+                    and stay_doc.status == "Checked In"
+                    and getdate(audit_date) == today
+                ):
+                    frappe.db.set_value("Room", stay_doc.room, "status", "Occupied Dirty")
+                continue
+
             profile_doc = self.ensure_profile_for_stay(stay_doc)
             self.add_payment_entry(profile_doc, stay_doc)
             # Housekeeping: only for today's audit and still in-house (skip backfill / checked-out)

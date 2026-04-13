@@ -8,6 +8,16 @@ from frappe import _
 from datetime import datetime, timedelta
 from frappe.utils import get_datetime
 
+
+def _resolve_default_customer_group(settings):
+    """Return a safe non-group customer group for auto-created customers."""
+    group = settings.get("default_customer_group") or "Individual Customer"
+    if frappe.db.get_value("Customer Group", group, "is_group"):
+        fallback = frappe.db.get_value("Customer Group", {"is_group": 0}, "name")
+        return fallback or group
+    return group
+
+
 @frappe.whitelist()
 def create_folio(checked_in_name):
 	"""Manually create a folio for a submitted Checked In document."""
@@ -16,6 +26,20 @@ def create_folio(checked_in_name):
 		frappe.throw(_("Folio can only be created for submitted documents."))
 	doc._create_folio()
 	return doc.profile
+
+
+@frappe.whitelist()
+def retry_sales_invoice_sync(checked_in_name):
+	"""Re-attempt ERPXpand Sales Invoice creation for a stay that previously failed."""
+	frappe.has_permission("Checked In", "write", checked_in_name, throw=True)
+	doc = frappe.get_doc("Checked In", checked_in_name)
+	if doc.status != "Checked Out":
+		frappe.throw(_("Invoice sync can only be retried for checked-out stays."))
+	if doc.sales_invoice:
+		frappe.throw(_("A Sales Invoice ({0}) already exists for this stay.").format(doc.sales_invoice))
+	doc._create_erp_invoice()
+	status = frappe.db.get_value("Checked In", checked_in_name, "invoice_sync_status")
+	return status
 
 
 @frappe.whitelist()
@@ -81,11 +105,21 @@ def extend_stay(checked_in_name, new_checkout, reason=None):
 	return {"new_checkout": str(new_checkout_dt), "extra_nights": extra_nights}
 
 
+_HK_DEDUPE_WINDOW_MINUTES = 5  # Suppress duplicate service alerts within this window
+
+
 @frappe.whitelist()
 def notify_housekeeping(checked_in_name, service_type):
 	"""
-	Send an in-app (and email) notification to all active housekeepers for a guest service request.
+	Send an in-app (and email) notification to housekeepers for a guest service request.
 	service_type: "Do Not Disturb", "Make Up Room", or "Turndown"
+
+	Deduplication: suppresses a repeat notification for the same stay + service type
+	within the configured dedupe window (default 5 minutes) to prevent alert fatigue.
+
+	Targeting: if a Housekeeping Assignment links this room to specific housekeepers,
+	only those assigned workers are notified. Falls back to all active housekeepers
+	when no assignment exists (e.g. unassigned or DND where no action is needed).
 	"""
 	doc = frappe.get_doc("Checked In", checked_in_name)
 
@@ -98,16 +132,29 @@ def notify_housekeeping(checked_in_name, service_type):
 	if not message_tmpl:
 		frappe.throw(_("Unknown service type: {0}").format(service_type))
 
+	# Dedupe guard: skip if the same alert was sent for this stay + service within the window
+	from frappe.utils import add_to_date, now_datetime
+	cutoff = add_to_date(now_datetime(), minutes=-_HK_DEDUPE_WINDOW_MINUTES)
+	recent_duplicate = frappe.db.exists("Notification Log", {
+		"document_type": "Checked In",
+		"document_name": checked_in_name,
+		"subject": ["like", f"%{service_type}%"],
+		"creation": [">", cutoff],
+	})
+	if recent_duplicate:
+		return True  # Silently skip — duplicate within dedupe window
+
 	subject = _("[iHotel] {0} — Room {1}").format(service_type, doc.room)
 	message = message_tmpl.format(doc.room, doc.guest)
 
-	housekeepers = frappe.get_all(
+	# Prefer assigned housekeepers for this room; fall back to all active housekeepers
+	recipients = _get_assigned_housekeepers(doc.room) or frappe.get_all(
 		"Housekeeper",
 		filters={"is_active": 1},
 		fields=["employee_name", "user", "email"],
 	)
 
-	for hk in housekeepers:
+	for hk in recipients:
 		if hk.user:
 			frappe.get_doc({
 				"doctype": "Notification Log",
@@ -130,6 +177,29 @@ def notify_housekeeping(checked_in_name, service_type):
 			)
 
 	return True
+
+
+def _get_assigned_housekeepers(room):
+	"""
+	Return active housekeepers currently assigned to this room via Housekeeping Assignment.
+	Returns an empty list if none are assigned, signalling the caller to fall back.
+	"""
+	if not room:
+		return []
+	try:
+		assignments = frappe.db.sql("""
+			SELECT DISTINCT hk.employee_name, hk.user, hk.email
+			FROM `tabHousekeeping Assignment` ha
+			INNER JOIN `tabHousekeeping Assignment Room` har ON har.parent = ha.name
+			INNER JOIN `tabHousekeeper` hk ON hk.name = ha.housekeeper
+			WHERE har.room = %s
+			  AND ha.status IN ('Assigned', 'In Progress')
+			  AND hk.is_active = 1
+		""", room, as_dict=True)
+		return assignments
+	except Exception:
+		# Table may not exist or schema may differ; fall back gracefully
+		return []
 
 
 @frappe.whitelist()
@@ -209,6 +279,21 @@ def move_room(checked_in_name, new_room, reason=None):
 
 	old_room = checked_in.room
 
+	# Acquire a row-level lock on the destination room to prevent simultaneous moves
+	frappe.db.sql("SELECT name FROM `tabRoom` WHERE name=%s FOR UPDATE", new_room)
+
+	# Re-verify no conflict appeared since the pre-check above (race guard)
+	conflict_after_lock = frappe.db.exists("Checked In", {
+		"room": new_room,
+		"status": ["in", ["Reserved", "Checked In"]],
+		"docstatus": 1,
+		"name": ["!=", checked_in_name],
+	})
+	if conflict_after_lock:
+		frappe.throw(
+			_("Room {0} was just occupied by another guest. Please choose a different room.").format(new_room)
+		)
+
 	# ── Update Checked In record ──────────────────────────────────────────────
 	new_room_type = frappe.db.get_value("Room", new_room, "room_type")
 	checked_in.db_set("room", new_room, update_modified=False)
@@ -258,8 +343,6 @@ def move_room(checked_in_name, new_room, reason=None):
 	)
 
 	return True
-
-	return new_room
 
 
 @frappe.whitelist()
@@ -578,12 +661,45 @@ class CheckedIn(Document):
         """
         Update room status when hotel stay is submitted.
         Auto-create a folio and post the initial room charge.
+        Performs a final locked room availability re-check to prevent race conditions.
         """
         self.db_set("status", "Checked In", update_modified=False)
         if not self.actual_check_in:
             self.db_set("actual_check_in", frappe.utils.now_datetime(), update_modified=False)
+        self._lock_and_verify_room()
         self.mark_room_as_occupied()
         self._create_folio()
+
+    def _lock_and_verify_room(self):
+        """
+        Acquire a row-level lock on the target room and re-verify availability.
+        Called from on_submit so the check happens inside the commit transaction,
+        preventing two simultaneous check-ins from both succeeding for the same room.
+        """
+        if not self.room:
+            return
+        # Lock the room row for the duration of this transaction
+        frappe.db.sql("SELECT name FROM `tabRoom` WHERE name=%s FOR UPDATE", self.room)
+
+        # Re-check for overlapping active stays now that we hold the lock
+        conflict = frappe.db.sql("""
+            SELECT name FROM `tabChecked In`
+            WHERE room = %s
+            AND status IN ('Reserved', 'Checked In')
+            AND docstatus = 1
+            AND name != %s
+            AND expected_check_in < %s
+            AND expected_check_out > %s
+        """, (self.room, self.name or "", self.expected_check_out, self.expected_check_in),
+            as_dict=True)
+
+        if conflict:
+            frappe.throw(
+                _("Room {0} was just taken by another reservation ({1}). Please assign a different room.").format(
+                    self.room, conflict[0].name
+                ),
+                title=_("Room Conflict")
+            )
 
     def _create_folio(self):
         """Create an iHotel Profile (folio) for this stay if one doesn't exist yet."""
@@ -606,17 +722,26 @@ class CheckedIn(Document):
 
         from frappe.utils import flt, nowdate
 
-        # Post each rate line as a folio charge
-        for rl in (self.rate_lines or []):
-            if not flt(rl.amount):
-                continue
-            profile.post_charge(
-                charge_type="Room Charge",
-                description=rl.description or _("Rate Charge"),
-                rate=flt(rl.amount),
-                quantity=1,
-                reference_doctype="Checked In",
-                reference_name=self.name,
+        # When no_post is set, room charges are blocked — only post additional services and deposits
+        no_post = frappe.db.get_value("Checked In", self.name, "no_post") or self.no_post
+
+        # Post each rate line as a folio charge (skipped when no_post is enabled)
+        if not no_post:
+            for rl in (self.rate_lines or []):
+                if not flt(rl.amount):
+                    continue
+                profile.post_charge(
+                    charge_type="Room Charge",
+                    description=rl.description or _("Rate Charge"),
+                    rate=flt(rl.amount),
+                    quantity=1,
+                    reference_doctype="Checked In",
+                    reference_name=self.name,
+                )
+        else:
+            frappe.log_error(
+                title=f"iHotel: No Post active for {self.name}",
+                message=f"Room charges skipped at folio creation because no_post=1 on stay {self.name}."
             )
 
         # Post each additional service as a folio charge
@@ -795,7 +920,11 @@ class CheckedIn(Document):
     # ── ERPXpand Accounting Integration ────────────────────────────────────────
 
     def _create_erp_invoice(self):
-        """Create a Sales Invoice (and Payment Entries) in ERPXpand on checkout."""
+        """Create a Sales Invoice (and Payment Entries) in ERPXpand on checkout.
+
+        Persists outcome in invoice_sync_status/invoice_sync_error so front desk
+        can see failures and trigger a retry without re-doing the full checkout.
+        """
         from frappe.utils import flt, nowdate
 
         try:
@@ -832,6 +961,8 @@ class CheckedIn(Document):
                 return
 
             self.db_set("sales_invoice", invoice.name, update_modified=False)
+            self.db_set("invoice_sync_status", "Synced", update_modified=False)
+            self.db_set("invoice_sync_error", "", update_modified=False)
 
             if profile.get("payments"):
                 self._create_payment_entries(profile, invoice, customer, company)
@@ -845,16 +976,23 @@ class CheckedIn(Document):
             )
 
         except Exception as e:
-            frappe.log_error(f"iHotel: Error creating Sales Invoice for {self.name}: {str(e)}")
+            error_msg = str(e)
+            frappe.log_error(f"iHotel: Error creating Sales Invoice for {self.name}: {error_msg}")
+            # Persist failure so the retry button in the form becomes actionable
+            self.db_set("invoice_sync_status", "Failed", update_modified=False)
+            self.db_set("invoice_sync_error", error_msg[:500], update_modified=False)
             frappe.msgprint(
                 _("Checkout complete, but Sales Invoice could not be auto-created. "
-                  "Please create it manually. Error has been logged."),
+                  "Use Retry Invoice Sync on the form or create it manually. Error has been logged."),
                 indicator="orange",
                 alert=True,
             )
 
     def _get_or_create_customer(self, settings, company):
-        """Return ERPXpand Customer name, creating one from the Guest if needed."""
+        """Return ERPXpand Customer name, creating one from the Guest if needed.
+        Auto-creation uses ignore_permissions because it runs in a system context
+        (on_update_after_submit / night audit). Actor and reason are logged.
+        """
         if not self.guest:
             return None
 
@@ -871,11 +1009,17 @@ class CheckedIn(Document):
                 "doctype": "Customer",
                 "customer_name": guest_name,
                 "customer_type": "Individual",
-                "customer_group": settings.get("default_customer_group") or "All Customer Groups",
+                "customer_group": _resolve_default_customer_group(settings),
                 "territory": settings.get("default_territory") or "All Territories",
                 "mobile_no": guest_phone,
             })
+            # Bypass used here because checkout / night-audit may run as a system user
+            # that lacks Customer create rights. Actor logged for audit trail.
             cust.insert(ignore_permissions=True)
+            frappe.log_error(
+                title=f"iHotel: auto-created Customer for guest {self.guest}",
+                message=f"Actor: {frappe.session.user} | Stay: {self.name} | Customer: {cust.name}"
+            )
             return cust.name
         except Exception as e:
             frappe.log_error(f"iHotel: Could not create Customer for guest {self.guest}: {str(e)}")

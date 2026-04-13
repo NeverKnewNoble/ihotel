@@ -83,6 +83,8 @@
   "cancellation_policy",
   "column_break_pol2",
   "privacy_policy",
+  "validation_tab",
+  "strict_payment_validation",
   "hr_integration_tab",
   "enforce_roster_check",
   "allow_past_dates",
@@ -412,6 +414,18 @@
    "fieldname": "privacy_policy",
    "fieldtype": "Text Editor",
    "label": "Privacy Policy"
+  },
+  {
+   "fieldname": "validation_tab",
+   "fieldtype": "Tab Break",
+   "label": "Validation"
+  },
+  {
+   "default": "0",
+   "description": "When enabled, missing payment details (card last4, cheque number, etc.) will block save instead of showing a warning. Enable gradually after monitoring warning rates.",
+   "fieldname": "strict_payment_validation",
+   "fieldtype": "Check",
+   "label": "Strict Payment Validation (block on incomplete details)"
   },
   {
    "fieldname": "hr_integration_tab",

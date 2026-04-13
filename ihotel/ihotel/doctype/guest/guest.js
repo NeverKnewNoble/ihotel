@@ -38,6 +38,24 @@ frappe.ui.form.on("Guest", {
 			frappe.new_doc("Checked In", { guest: frm.doc.name });
 		}, __("View"));
 
+		// Show Retry Sync button when the ERPXpand customer sync previously failed
+		if (frm.doc.sync_status === "Failed") {
+			frm.add_custom_button(__("Retry ERP Sync"), function () {
+				frappe.call({
+					method: "ihotel.ihotel.doctype.guest.guest.retry_customer_sync",
+					args: { guest_name: frm.doc.name },
+					callback(r) {
+						frm.reload_doc();
+					},
+				});
+			}).addClass("btn-warning");
+
+			// Dashboard alert so the failure is impossible to miss
+			let err_msg = __("ERP Customer sync failed.");
+			if (frm.doc.sync_error) err_msg += " " + frm.doc.sync_error;
+			frm.dashboard.add_comment(err_msg, "red", true);
+		}
+
 		// Color all custom action buttons
 		frm.page.custom_actions.find("button")
 			.removeClass("btn-default btn-secondary").addClass("btn-primary");
@@ -60,7 +78,47 @@ frappe.ui.form.on("Guest", {
 
 	id_scan(frm)      { render_id_scan_preview(frm); },
 	id_scan_back(frm) { render_id_scan_preview(frm); },
+
+	// Live duplicate check when phone is entered
+	phone(frm) { check_duplicate_guest(frm); },
+
+	// Live duplicate check when email is entered
+	email(frm) { check_duplicate_guest(frm); },
 });
+
+// ─── Duplicate detection helper ───────────────────────────────────────────────
+
+let _dup_check_timer = null;
+
+function check_duplicate_guest(frm) {
+	// Debounce: wait for the user to finish typing before querying
+	clearTimeout(_dup_check_timer);
+	_dup_check_timer = setTimeout(() => {
+		const phone = frm.doc.phone;
+		const email = frm.doc.email;
+		if (!phone && !email) return;
+
+		frappe.call({
+			method: "ihotel.ihotel.doctype.guest.guest.get_duplicate_candidates",
+			args: {
+				phone: phone || null,
+				email: email || null,
+				exclude_name: frm.is_new() ? null : frm.doc.name,
+			},
+			callback(r) {
+				const matches = r.message || [];
+				if (!matches.length) return;
+				const names = matches.map(m =>
+					`<a href="/app/guest/${encodeURIComponent(m.name)}" target="_blank">${frappe.utils.escape_html(m.guest_name)}</a>`
+				).join(", ");
+				frappe.show_alert({
+					message: __("Possible duplicate guest(s): {0}", [names]),
+					indicator: "orange",
+				}, 8);
+			},
+		});
+	}, 800);
+}
 
 // ─── Scan dialog ──────────────────────────────────────────────────────────────
 

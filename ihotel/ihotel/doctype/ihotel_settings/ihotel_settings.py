@@ -9,6 +9,7 @@ from frappe import _
 class iHotelSettings(Document):
 	def validate(self):
 		self.validate_accounting()
+		self.validate_default_customer_group()
 
 	def on_update(self):
 		if self.currency:
@@ -35,3 +36,10 @@ class iHotelSettings(Document):
 			frappe.throw(_("Please set a Room Charge Item before enabling accounting integration."))
 		if not self.extra_charge_item:
 			frappe.throw(_("Please set an Extra Charges Item before enabling accounting integration."))
+
+	def validate_default_customer_group(self):
+		"""Ensure configured customer group is selectable (not a tree/group node)."""
+		if self.default_customer_group and frappe.db.get_value("Customer Group", self.default_customer_group, "is_group"):
+			frappe.throw(
+				_("Default Customer Group must be a non-group (leaf) Customer Group, for example Individual Customer.")
+			)
