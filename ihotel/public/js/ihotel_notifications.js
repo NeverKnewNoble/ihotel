@@ -1,6 +1,11 @@
 (() => {
 	const BANNER_ID = "ihotel-notification-banner";
 	let checkInFlight = false;
+	let intervalId = null;
+	const BASE_POLL_MS = 30000;
+	const MAX_BACKOFF_MS = 300000;
+	let currentPollMs = BASE_POLL_MS;
+	const IHOTEL_WORKSPACE_KEY = "ihotel";
 
 	function getBanner() {
 		return document.getElementById(BANNER_ID);
@@ -9,6 +14,26 @@
 	function hideBanner() {
 		const banner = getBanner();
 		if (banner) banner.remove();
+	}
+
+	function normalizeWorkspaceName(name) {
+		return String(name || "")
+			.toLowerCase()
+			.replace(/[\s_-]/g, "");
+	}
+
+	function getCurrentWorkspaceName() {
+		if (!frappe.get_route || typeof frappe.get_route !== "function") return null;
+		const route = frappe.get_route();
+		if (!Array.isArray(route) || !route.length) return null;
+
+		const routeRoot = String(route[0] || "").toLowerCase();
+		if (routeRoot !== "workspace" && routeRoot !== "workspaces") return null;
+		return route[1] || null;
+	}
+
+	function isIhotelWorkspaceActive() {
+		return normalizeWorkspaceName(getCurrentWorkspaceName()) === IHOTEL_WORKSPACE_KEY;
 	}
 
 	function clickBySelectors(selectors) {
@@ -125,8 +150,7 @@
 		banner.style.cssText = [
 			"position: fixed",
 			"top: 56px",
-			"left: 50%",
-			"transform: translateX(-50%)",
+			"right: 12px",
 			"z-index: 1040",
 			"background: #0b5fff",
 			"color: #fff",
@@ -172,27 +196,63 @@
 
 	function checkUnreadNotifications() {
 		if (!frappe.session || frappe.session.user === "Guest" || checkInFlight) return;
+		if (!isIhotelWorkspaceActive()) {
+			hideBanner();
+			return;
+		}
 		checkInFlight = true;
 
 		frappe
 			.xcall("frappe.desk.doctype.notification_log.notification_log.get_notification_logs", { limit: 20 })
 			.then((r) => {
-				const logs = (r && r.notification_logs) || [];
-				const hasUnread = logs.some((d) => cint(d.read) === 0);
+				// Frappe can return logs in different shapes across versions.
+				const logs = Array.isArray(r)
+					? r
+					: Array.isArray(r?.notification_logs)
+						? r.notification_logs
+						: Array.isArray(r?.message)
+							? r.message
+							: Array.isArray(r?.message?.notification_logs)
+								? r.message.notification_logs
+								: [];
+				const hasUnread = logs.some((d) => Number(d?.read ?? 0) === 0);
+				currentPollMs = BASE_POLL_MS;
+				ensureWatcherInterval();
 				if (hasUnread) showBanner();
 				else hideBanner();
+			})
+			.catch(() => {
+				// Reset stale UI state and back off polling on transient failures.
+				hideBanner();
+				currentPollMs = Math.min(currentPollMs * 2, MAX_BACKOFF_MS);
+				ensureWatcherInterval();
 			})
 			.finally(() => {
 				checkInFlight = false;
 			});
 	}
 
-	$(document).on("app_ready", () => {
+	function ensureWatcherInterval() {
+		if (intervalId) window.clearInterval(intervalId);
+		intervalId = window.setInterval(checkUnreadNotifications, currentPollMs);
+	}
+
+	function startNotificationWatcher() {
+		if (intervalId) return;
 		checkUnreadNotifications();
-		setInterval(checkUnreadNotifications, 30000);
-	});
+		ensureWatcherInterval();
+	}
+
+	$(document).on("app_ready", startNotificationWatcher);
+	// Handle cases where app_ready fired before this script got loaded.
+	if (frappe.boot?.user || frappe.session?.user) {
+		startNotificationWatcher();
+	}
 
 	// Trigger immediate re-check whenever a new notification is pushed.
 	frappe.realtime.on("notification", checkUnreadNotifications);
 	frappe.realtime.on("ihotel_new_notification", checkUnreadNotifications);
+	if (frappe.router?.on && typeof frappe.router.on === "function") {
+		frappe.router.on("change", checkUnreadNotifications);
+	}
 })();

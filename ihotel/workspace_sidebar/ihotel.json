@@ -1,6 +1,6 @@
 {
  "app": "ihotel",
- "creation": "2026-04-09 22:56:00.595136",
+ "creation": "2026-04-13 11:04:38.442552",
  "docstatus": 0,
  "doctype": "Workspace Sidebar",
  "header_icon": "retail",
@@ -613,11 +613,11 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "briefcase",
+   "icon": "list",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Business Source Category",
-   "link_to": "Business Source Category",
+   "label": "Hotel Account",
+   "link_to": "Hotel Account",
    "link_type": "DocType",
    "show_arrow": 0,
    "type": "Link"
@@ -625,11 +625,11 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "list",
+   "icon": "briefcase",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Hotel Account",
-   "link_to": "Hotel Account",
+   "label": "Business Source Category",
+   "link_to": "Business Source Category",
    "link_type": "DocType",
    "show_arrow": 0,
    "type": "Link"
@@ -647,7 +647,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-04-10 08:57:37.395793",
+ "modified": "2026-04-13 11:07:32.146331",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "iHotel",
