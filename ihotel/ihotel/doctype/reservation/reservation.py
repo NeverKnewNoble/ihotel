@@ -30,7 +30,7 @@ def _is_valid_card_expiry(expiry):
 
 def _resolve_default_customer_group(settings):
 	"""Return a safe non-group customer group for auto-created customers."""
-	group = settings.get("default_customer_group") or "Individual Customer"
+	group = settings.get("default_customer_group") or "Individual"
 	if frappe.db.get_value("Customer Group", group, "is_group"):
 		fallback = frappe.db.get_value("Customer Group", {"is_group": 0}, "name")
 		return fallback or group

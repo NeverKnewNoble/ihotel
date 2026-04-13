@@ -41,5 +41,5 @@ class iHotelSettings(Document):
 		"""Ensure configured customer group is selectable (not a tree/group node)."""
 		if self.default_customer_group and frappe.db.get_value("Customer Group", self.default_customer_group, "is_group"):
 			frappe.throw(
-				_("Default Customer Group must be a non-group (leaf) Customer Group, for example Individual Customer.")
+				_("Default Customer Group must be a non-group (leaf) Customer Group, for example Individual.")
 			)
