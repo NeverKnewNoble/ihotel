@@ -42,16 +42,24 @@ class Guest(Document):
 				self.db_set("customer", existing, update_modified=False)
 				return
 
+			# Some sites enforce Customer.mobile_no as mandatory (HR/Employee customizations).
+			# Skip auto-customer creation when guest mobile is empty to avoid blocking guest saves.
+			if not self.phone:
+				return
+
 			settings = frappe.get_single("iHotel Settings")
-			cust = frappe.get_doc({
+			customer_payload = {
 				"doctype": "Customer",
 				"customer_name": self.guest_name,
 				"custom_customer_id": self.guest_name,
 				"customer_type": "Individual",
 				"customer_group": settings.get("default_customer_group") or "All Customer Groups",
 				"territory": settings.get("default_territory") or "All Territories",
-				"mobile_no": self.phone,
-			})
+			}
+			if self.phone:
+				customer_payload["mobile_no"] = str(self.phone)
+
+			cust = frappe.get_doc(customer_payload)
 			cust.insert(ignore_permissions=True)
 			self.db_set("customer", cust.name, update_modified=False)
 		except Exception as e:
@@ -68,9 +76,7 @@ class Guest(Document):
 				frappe.throw(_("Please enter a valid email address"))
 
 		if self.phone:
-			phone = self.phone.strip().replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
-			if phone.startswith("+"):
-				phone = phone[1:]
+			phone = str(self.phone).strip()
 			if not phone.isdigit() or len(phone) < 7 or len(phone) > 15:
 				frappe.throw(_("Please enter a valid phone number (7-15 digits)"))
 

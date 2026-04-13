@@ -95,8 +95,8 @@
   },
   {
    "fieldname": "phone",
-   "fieldtype": "Phone",
-   "label": "Phone"
+   "fieldtype": "Data",
+   "label": "Mobile Number"
   },
   {
    "fieldname": "email",
