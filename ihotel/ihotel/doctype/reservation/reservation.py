@@ -323,13 +323,15 @@ def create_proforma_invoice(reservation_name):
 		customer = frappe.db.get_value("Customer", {"customer_name": guest_name})
 		if not customer:
 			guest_phone = frappe.db.get_value("Guest", res.guest, "phone") if res.guest else None
+			mobile = str(guest_phone) if guest_phone else None
 			cust = frappe.get_doc({
 				"doctype": "Customer",
 				"customer_name": guest_name,
 				"customer_type": "Individual",
 				"customer_group": _resolve_default_customer_group(settings),
 				"territory": settings.default_territory or "All Territories",
-				"mobile_no": guest_phone,
+				"mobile_no": mobile,
+				"mobile_number": mobile,
 			})
 			cust.insert(ignore_permissions=True)
 			customer = cust.name

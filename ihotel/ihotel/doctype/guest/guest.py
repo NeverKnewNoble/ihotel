@@ -16,6 +16,11 @@ def _resolve_default_customer_group(settings):
 	return group
 
 
+def _guest_has_field(fieldname):
+	"""Guard db_set calls for sites that haven't migrated Guest columns yet."""
+	return frappe.get_meta("Guest").has_field(fieldname)
+
+
 class Guest(Document):
 	def validate(self):
 		self.validate_contact_info()
@@ -107,15 +112,17 @@ class Guest(Document):
 					frappe.db.set_value("Customer", db_customer, "customer_name", self.guest_name,
 					                    update_modified=False)
 				# Mark synced only if status wasn't already Synced (avoids redundant writes)
-				if frappe.db.get_value("Guest", self.name, "sync_status") != "Synced":
-					self.db_set("sync_status", "Synced", update_modified=False)
+				if _guest_has_field("sync_status"):
+					if frappe.db.get_value("Guest", self.name, "sync_status") != "Synced":
+						self.db_set("sync_status", "Synced", update_modified=False)
 				return
 
 			# No link yet — find by name or create
 			existing = frappe.db.get_value("Customer", {"customer_name": self.guest_name})
 			if existing:
 				self.db_set("customer", existing, update_modified=False)
-				self.db_set("sync_status", "Synced", update_modified=False)
+				if _guest_has_field("sync_status"):
+					self.db_set("sync_status", "Synced", update_modified=False)
 				return
 
 			# Some sites enforce Customer.mobile_no as mandatory (HR/Employee customizations).
@@ -133,19 +140,26 @@ class Guest(Document):
 				"territory": settings.get("default_territory") or "All Territories",
 			}
 			if self.phone:
-				customer_payload["mobile_no"] = str(self.phone)
+				# Set both keys for compatibility with custom hooks across sites/apps.
+				mobile = str(self.phone)
+				customer_payload["mobile_no"] = mobile
+				customer_payload["mobile_number"] = mobile
 
 			cust = frappe.get_doc(customer_payload)
 			cust.insert(ignore_permissions=True)
 			self.db_set("customer", cust.name, update_modified=False)
-			self.db_set("sync_status", "Synced", update_modified=False)
-			self.db_set("sync_error", "", update_modified=False)
+			if _guest_has_field("sync_status"):
+				self.db_set("sync_status", "Synced", update_modified=False)
+			if _guest_has_field("sync_error"):
+				self.db_set("sync_error", "", update_modified=False)
 		except Exception as e:
 			error_msg = str(e)
 			frappe.log_error(f"iHotel: Could not sync Guest {self.name} to Customer: {error_msg}")
 			# Persist failure so staff can see it on the form and use the Retry button
-			self.db_set("sync_status", "Failed", update_modified=False)
-			self.db_set("sync_error", error_msg[:500], update_modified=False)
+			if _guest_has_field("sync_status"):
+				self.db_set("sync_status", "Failed", update_modified=False)
+			if _guest_has_field("sync_error"):
+				self.db_set("sync_error", error_msg[:500], update_modified=False)
 			frappe.msgprint(
 				_("Guest saved, but could not sync to ERPXpand Customer. Use Retry Sync on the form or check the Error Log."),
 				indicator="orange",
