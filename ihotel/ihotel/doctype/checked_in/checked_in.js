@@ -8,6 +8,22 @@ const ADULTS_RATE_COLUMN_MAP = {
 	4: "Quad Rate",
 };
 
+// Debounce tracker: prevents duplicate housekeeping pings from rapid toggle actions.
+// Maps "service_type" → timestamp of last outbound call.
+const _hk_notify_last_sent = {};
+const HK_CLIENT_DEBOUNCE_MS = 10000;  // 10 seconds between client-side duplicate calls
+
+function notify_housekeeping_debounced(frm, service_type) {
+	const now = Date.now();
+	const last = _hk_notify_last_sent[service_type] || 0;
+	if (now - last < HK_CLIENT_DEBOUNCE_MS) return;  // Still within debounce window
+	_hk_notify_last_sent[service_type] = now;
+	frappe.call({
+		method: "ihotel.ihotel.doctype.checked_in.checked_in.notify_housekeeping",
+		args: { checked_in_name: frm.doc.name, service_type },
+	});
+}
+
 frappe.ui.form.on("Checked In", {
 	onload(frm) {
 		setup_room_query(frm);
@@ -63,6 +79,40 @@ frappe.ui.form.on("Checked In", {
 					});
 				}, __("Billing"));
 			}
+
+			// Show Retry Invoice Sync button when the ERP sync previously failed
+			if (frm.doc.invoice_sync_status === "Failed" && !frm.doc.sales_invoice) {
+				frm.add_custom_button(__("Retry Invoice Sync"), function() {
+					frappe.call({
+						method: "ihotel.ihotel.doctype.checked_in.checked_in.retry_sales_invoice_sync",
+						args: { checked_in_name: frm.doc.name },
+						callback(r) {
+							frm.reload_doc();
+							if (r.message === "Synced") {
+								frappe.show_alert({ message: __("Invoice sync successful."), indicator: "green" });
+							} else {
+								frappe.show_alert({ message: __("Invoice sync failed again. Check Error Log."), indicator: "red" });
+							}
+						},
+					});
+				}, __("Billing")).addClass("btn-warning");
+			}
+
+			// No Post banner — warns staff that room charges are blocked on this stay
+			if (frm.doc.no_post) {
+				frm.dashboard.add_comment(
+					__("No Post is active: room charges are blocked for this stay."),
+					"orange",
+					true
+				);
+			}
+
+			// Show invoice sync failure alert on the form
+			if (frm.doc.invoice_sync_status === "Failed") {
+				let msg = __("ERP Invoice sync failed.");
+				if (frm.doc.invoice_sync_error) msg += " " + frm.doc.invoice_sync_error;
+				frm.dashboard.add_comment(msg, "red", true);
+			}
 		}
 
 		// Status-based action buttons
@@ -91,12 +141,7 @@ frappe.ui.form.on("Checked In", {
 					const turning_on = !frm.doc.do_not_disturb;
 					frm.set_value("do_not_disturb", turning_on ? 1 : 0);
 					frm.save().then(() => {
-						if (turning_on) {
-							frappe.call({
-								method: "ihotel.ihotel.doctype.checked_in.checked_in.notify_housekeeping",
-								args: { checked_in_name: frm.doc.name, service_type: "Do Not Disturb" },
-							});
-						}
+						if (turning_on) notify_housekeeping_debounced(frm, "Do Not Disturb");
 					});
 				}, __("Guest Services")
 			);
@@ -107,12 +152,7 @@ frappe.ui.form.on("Checked In", {
 					const turning_on = !frm.doc.make_up_room;
 					frm.set_value("make_up_room", turning_on ? 1 : 0);
 					frm.save().then(() => {
-						if (turning_on) {
-							frappe.call({
-								method: "ihotel.ihotel.doctype.checked_in.checked_in.notify_housekeeping",
-								args: { checked_in_name: frm.doc.name, service_type: "Make Up Room" },
-							});
-						}
+						if (turning_on) notify_housekeeping_debounced(frm, "Make Up Room");
 					});
 				}, __("Guest Services")
 			);
@@ -123,12 +163,7 @@ frappe.ui.form.on("Checked In", {
 					const turning_on = !frm.doc.turndown_requested;
 					frm.set_value("turndown_requested", turning_on ? 1 : 0);
 					frm.save().then(() => {
-						if (turning_on) {
-							frappe.call({
-								method: "ihotel.ihotel.doctype.checked_in.checked_in.notify_housekeeping",
-								args: { checked_in_name: frm.doc.name, service_type: "Turndown" },
-							});
-						}
+						if (turning_on) notify_housekeeping_debounced(frm, "Turndown");
 					});
 				}, __("Guest Services")
 			);

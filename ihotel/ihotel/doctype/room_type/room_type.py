@@ -22,16 +22,7 @@ class RoomType(Document):
         """
         Validate room type information before saving.
         """
-        self.validate_rates()
         self.validate_amenities()
-
-    def validate_rates(self):
-        """
-        Ensure rack rate is positive.
-        Rack rate is the standard room rate for this room type.
-        """
-        if self.rack_rate and self.rack_rate <= 0:
-            frappe.throw(_("Rack Rate must be greater than 0"))
 
     def validate_amenities(self):
         """

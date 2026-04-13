@@ -57,7 +57,9 @@
   "total_nights",
   "column_break_stats",
   "total_revenue",
-  "last_stay_date"
+  "last_stay_date",
+  "sync_status",
+  "sync_error"
  ],
  "fields": [
   {
@@ -337,6 +339,23 @@
   {
    "fieldname": "section_break_utlj",
    "fieldtype": "Section Break"
+  },
+  {
+   "default": "Not Synced",
+   "fieldname": "sync_status",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "ERP Sync Status",
+   "options": "Not Synced\nSynced\nFailed",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.sync_status === 'Failed'",
+   "fieldname": "sync_error",
+   "fieldtype": "Small Text",
+   "hidden": 1,
+   "label": "Sync Error",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
