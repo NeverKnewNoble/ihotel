@@ -1,8 +1,9 @@
 {% set s = frappe.get_single('iHotel Settings') %}
 {% set hotel = s.hotel_name or 'iHotel' %}
 {% set currency = s.currency or '' %}
-{% set ci_time = (s.default_check_in_time or '14:00:00')[:5] %}
-{% set co_time = (s.default_check_out_time or '12:00:00')[:5] %}
+{# Time fields are timedelta in Python — never slice directly; format first #}
+{% set ci_time = (frappe.format_value(s.default_check_in_time, {"fieldtype": "Time"}) if s.default_check_in_time else '14:00:00')[:5] %}
+{% set co_time = (frappe.format_value(s.default_check_out_time, {"fieldtype": "Time"}) if s.default_check_out_time else '12:00:00')[:5] %}
 {% set signatory = s.hotel_signatory_name or ('The ' + hotel + ' Team') %}
 {% set sign_title = s.hotel_signatory_title or '' %}
 {% set pax = (doc.adults or 1)|string + ' Adult(s)' %}
@@ -18,8 +19,12 @@
 {% if rate_label %}{% set rate_str = rate_str + ' (' + rate_label + ')' %}{% endif %}
 {% set payment = doc.payment_method or '-' %}
 {% if doc.credit_card_type %}{% set payment = doc.credit_card_type %}{% if doc.credit_card_last4 %}{% set payment = payment + ' ending ' + doc.credit_card_last4 %}{% endif %}{% endif %}
-{% set arr_time = (doc.eta or doc.check_in_time or '') %}
-{% if arr_time %}{% set arr_time = arr_time[:5] %}{% else %}{% set arr_time = 'Please advise' %}{% endif %}
+{% set arr_time = doc.eta or doc.check_in_time %}
+{% if arr_time %}
+  {% set arr_time = (frappe.format_value(arr_time, {"fieldtype": "Time"}) or '')[:5] %}
+{% else %}
+  {% set arr_time = 'Please advise' %}
+{% endif %}
 {% set prefs = doc.special_requests or 'Please advise with any preferences' %}
 {% set source = doc.business_source_category or '-' %}
 <!DOCTYPE html>
