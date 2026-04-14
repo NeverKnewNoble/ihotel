@@ -98,7 +98,8 @@
   {
    "fieldname": "phone",
    "fieldtype": "Data",
-   "label": "Mobile Number"
+   "label": "Mobile Number",
+   "placeholder": "+233 xxx-xxx-xx or 0xxxxxxxx"
   },
   {
    "fieldname": "email",
@@ -361,7 +362,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-28 20:03:45.229380",
+ "modified": "2026-04-14 20:38:22.540793",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Guest",
