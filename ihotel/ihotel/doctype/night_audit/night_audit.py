@@ -180,12 +180,17 @@ class NightAudit(Document):
 
     def add_payment_entry(self, profile_doc, stay_doc):
         """
-        Append a nightly room charge to the folio using the audit date.
-        Skips if a room charge for this audit date already exists (prevents duplicates on re-run).
+        Append one nightly room charge to the folio for the audit date.
+
+        Nightly billing model rules:
+        - Exactly one Room Charge row per stay per audit date (duplicate guard prevents re-runs).
+        - Rate is always the stay's current room_rate field (nightly price).
+        - Stays with a zero/missing room_rate are skipped and logged so invalid data
+          does not silently create zero-value revenue rows.
         """
         audit_date = self.audit_date
 
-        # Duplicate guard: don't post twice for the same audit date
+        # Duplicate guard: re-running the same audit must not post a second charge.
         already_posted = any(
             str(r.charge_date) == str(audit_date)
             and r.charge_type == "Room Charge"
@@ -193,6 +198,19 @@ class NightAudit(Document):
             for r in profile_doc.get("charges", [])
         )
         if already_posted:
+            return
+
+        # Guard: a zero or missing room_rate would create meaningless revenue rows.
+        nightly_rate = flt(stay_doc.room_rate)
+        if nightly_rate <= 0:
+            frappe.log_error(
+                title=f"iHotel Night Audit: zero rate — {stay_doc.name}",
+                message=(
+                    f"Night audit {self.name} ({audit_date}): room charge skipped for stay "
+                    f"{stay_doc.name} (Room {stay_doc.room}) because room_rate is {nightly_rate}. "
+                    "Set a valid room rate on the stay to have charges posted."
+                ),
+            )
             return
 
         # Resolve mapping so configuration can be validated early by lookup.
@@ -205,8 +223,8 @@ class NightAudit(Document):
                 stay_doc.room or "", audit_date
             ),
             "quantity": 1,
-            "rate": stay_doc.room_rate or 0,
-            "amount": stay_doc.room_rate or 0,
+            "rate": nightly_rate,
+            "amount": nightly_rate,
             "reference_doctype": "Checked In",
             "reference_name": stay_doc.name,
         })

@@ -67,10 +67,11 @@ frappe.ui.form.on("Guest", {
 			callback(r) {
 				if (r.message) {
 					const s = r.message;
-					frm.set_value("total_stays",   s.total_stays   || 0);
-					frm.set_value("total_nights",  s.total_nights  || 0);
-					frm.set_value("total_revenue", s.total_revenue || 0);
-					frm.set_value("last_stay_date", s.last_stay_date || null);
+					// skip_dirty_trigger: stats are read-only rollups — must not leave the form "Not Saved"
+					frm.set_value("total_stays", s.total_stays || 0, null, true);
+					frm.set_value("total_nights", s.total_nights || 0, null, true);
+					frm.set_value("total_revenue", s.total_revenue || 0, null, true);
+					frm.set_value("last_stay_date", s.last_stay_date || null, null, true);
 				}
 			},
 		});

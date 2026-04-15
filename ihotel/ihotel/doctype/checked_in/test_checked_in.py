@@ -58,6 +58,75 @@ def _make_stay(suffix, room, room_type, guest, no_post=0, status="Reserved"):
 	return stay
 
 
+class TestCheckedInValidateDates(FrappeTestCase):
+	"""Regression tests for validate_dates — especially the minimum-stay calendar-night check."""
+
+	def setUp(self):
+		self.suffix = random_string(8)
+		self.rt = _make_room_type(f"VD{self.suffix}")
+		self.room = _make_room(f"VD{self.suffix}", self.rt.name)
+		self.guest = _make_guest(f"VD{self.suffix}")
+		frappe.db.set_single_value("iHotel Settings", "allow_past_dates", 1)
+		frappe.db.commit()
+
+	def tearDown(self):
+		for name, dt in [
+			(self.guest.name, "Guest"),
+			(self.room.name, "Room"),
+			(self.rt.name, "Room Type"),
+		]:
+			try:
+				frappe.delete_doc(dt, name, ignore_permissions=True, force=True)
+			except Exception:
+				pass
+		frappe.db.set_single_value("iHotel Settings", "allow_past_dates", 0)
+		frappe.db.commit()
+
+	def _make_doc(self, check_in_str, check_out_str):
+		"""Return an unsaved Checked In doc with the given datetime strings."""
+		return frappe.get_doc({
+			"doctype": "Checked In",
+			"guest": self.guest.name,
+			"room": self.room.name,
+			"room_type": self.rt.name,
+			"expected_check_in": check_in_str,
+			"expected_check_out": check_out_str,
+			"status": "Reserved",
+		})
+
+	def test_one_calendar_night_short_hours_passes(self):
+		"""
+		Apr-8 14:00 → Apr-9 11:00 is only ~21 hours (timedelta.days == 0) but
+		spans two calendar dates — must be treated as 1 valid hotel night.
+		"""
+		doc = self._make_doc("2026-04-08 14:00:00", "2026-04-09 11:00:00")
+		# validate_dates must not raise; insert/validate path triggers the check
+		try:
+			doc.validate_dates()
+		except frappe.ValidationError as e:
+			self.fail(f"validate_dates raised unexpectedly for a 1-night stay: {e}")
+
+	def test_same_calendar_day_raises(self):
+		"""Checkout on the same calendar date as check-in must still fail."""
+		doc = self._make_doc("2026-04-08 14:00:00", "2026-04-08 18:00:00")
+		with self.assertRaises(frappe.ValidationError):
+			doc.validate_dates()
+
+	def test_checkout_before_checkin_raises(self):
+		"""Checkout datetime before check-in datetime must raise."""
+		doc = self._make_doc("2026-04-09 14:00:00", "2026-04-08 11:00:00")
+		with self.assertRaises(frappe.ValidationError):
+			doc.validate_dates()
+
+	def test_multi_night_stay_passes(self):
+		"""A straightforward 3-night stay must pass."""
+		doc = self._make_doc("2026-04-08 14:00:00", "2026-04-11 11:00:00")
+		try:
+			doc.validate_dates()
+		except frappe.ValidationError as e:
+			self.fail(f"validate_dates raised unexpectedly for a 3-night stay: {e}")
+
+
 class TestCheckedInNoPost(FrappeTestCase):
 	"""Regression tests for no_post enforcement in folio and night audit."""
 
@@ -120,6 +189,55 @@ class TestCheckedInNoPost(FrappeTestCase):
 				# We have no rate lines in this test stay (no rate type configured),
 				# so no charges expected — just verify the folio was created
 				self.assertTrue(profile_name, "Folio must be created for normal stay")
+		finally:
+			try:
+				stay.reload()
+				if stay.docstatus == 1:
+					stay.cancel()
+				frappe.delete_doc("Checked In", stay.name, ignore_permissions=True, force=True)
+			except Exception:
+				pass
+
+
+class TestNightlyBillingModelCheckIn(FrappeTestCase):
+	"""
+	Nightly billing model: check-in must never post room charges up front.
+	Room revenue is posted exclusively by Night Audit, one charge per night.
+	"""
+
+	def setUp(self):
+		self.suffix = random_string(8)
+		self.rt = _make_room_type(f"NB{self.suffix}")
+		self.room = _make_room(f"NB{self.suffix}", self.rt.name)
+		self.guest = _make_guest(f"NB{self.suffix}")
+
+	def tearDown(self):
+		for name, dt in [
+			(self.guest.name, "Guest"),
+			(self.room.name, "Room"),
+			(self.rt.name, "Room Type"),
+		]:
+			try:
+				frappe.delete_doc(dt, name, ignore_permissions=True, force=True)
+			except Exception:
+				pass
+
+	def test_checkin_does_not_post_room_charges(self):
+		"""
+		Submitting a Checked In document must not create any Room Charge folio rows.
+		Room revenue is deferred entirely to Night Audit.
+		"""
+		stay = _make_stay(self.suffix, self.room.name, self.rt.name, self.guest.name)
+		try:
+			stay.reload()
+			profile_name = frappe.db.get_value("Checked In", stay.name, "profile")
+			if profile_name:
+				room_charges = frappe.db.count("Folio Charge", {
+					"parent": profile_name,
+					"charge_type": "Room Charge",
+				})
+				self.assertEqual(room_charges, 0,
+					"Check-in must not post any Room Charge rows in the nightly billing model")
 		finally:
 			try:
 				stay.reload()

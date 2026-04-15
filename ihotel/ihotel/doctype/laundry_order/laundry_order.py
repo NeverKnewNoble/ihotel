@@ -56,6 +56,11 @@ class LaundryOrder(Document):
 	def _post_to_folio(self):
 		if not self.post_to_folio:
 			return
+
+		# If ihotel_profile is not set, try to resolve it from the checked_in stay
+		if not self.ihotel_profile and self.checked_in:
+			self.ihotel_profile = frappe.db.get_value("Checked In", self.checked_in, "profile")
+
 		if not self.ihotel_profile:
 			frappe.msgprint(
 				_("Post to Folio is enabled but no iHotel Profile is linked. "
@@ -66,15 +71,18 @@ class LaundryOrder(Document):
 			return
 		if flt(self.total_amount) <= 0:
 			return
+
+		# Post charge via shared helper so charge_type, charge_date, and reference
+		# fields are consistently populated across all folio postings in the app
 		profile = frappe.get_doc("iHotel Profile", self.ihotel_profile)
-		profile.append("charges", {
-			"date": self.order_date or nowdate(),
-			"description": _("Laundry — {0}").format(self.name),
-			"quantity": 1,
-			"rate": flt(self.total_amount),
-			"amount": flt(self.total_amount),
-		})
-		profile.save(ignore_permissions=True)
+		profile.post_charge(
+			charge_type="Additional Service",
+			description=_("Laundry — {0}").format(self.name),
+			rate=flt(self.total_amount),
+			quantity=1,
+			reference_doctype="Laundry Order",
+			reference_name=self.name,
+		)
 
 	def _create_sales_invoice(self):
 		settings = frappe.get_single("Laundry Settings")

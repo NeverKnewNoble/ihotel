@@ -16,7 +16,7 @@ frappe.ui.form.on("Laundry Order", {
 		});
 
 		// If post_to_folio is already ticked but ihotel_profile is missing, try to auto-fill
-		if (frm.doc.post_to_folio && !frm.doc.ihotel_profile && frm.doc.reservation_id) {
+		if (frm.doc.post_to_folio && !frm.doc.ihotel_profile && frm.doc.checked_in) {
 			frm.trigger("post_to_folio");
 		}
 
@@ -65,13 +65,14 @@ frappe.ui.form.on("Laundry Order", {
 
 	customer_type(frm) {
 		frm.set_value("customer", "");
-		frm.set_value("reservation_id", "");
+		frm.set_value("checked_in", "");
 		frm.set_value("room_number", "");
 	},
 
-	reservation_id(frm) {
-		if (!frm.doc.reservation_id) return;
-		frappe.db.get_doc("Checked In", frm.doc.reservation_id).then(ci => {
+	// When a Checked In stay is selected, auto-fill room, guest, and folio profile
+	checked_in(frm) {
+		if (!frm.doc.checked_in) return;
+		frappe.db.get_doc("Checked In", frm.doc.checked_in).then(ci => {
 			if (ci.room) frm.set_value("room_number", ci.room);
 			if (ci.guest) frm.set_value("customer", ci.guest);
 			if (ci.profile) frm.set_value("ihotel_profile", ci.profile);
@@ -80,12 +81,12 @@ frappe.ui.form.on("Laundry Order", {
 
 	post_to_folio(frm) {
 		if (!frm.doc.post_to_folio || frm.doc.ihotel_profile) return;
-		if (!frm.doc.reservation_id) {
+		if (!frm.doc.checked_in) {
 			frappe.msgprint(__("Please select a Checked In record before posting to folio."));
 			frm.set_value("post_to_folio", 0);
 			return;
 		}
-		frappe.db.get_value("Checked In", frm.doc.reservation_id, "profile").then(r => {
+		frappe.db.get_value("Checked In", frm.doc.checked_in, "profile").then(r => {
 			const profile = r.message && r.message.profile;
 			if (profile) {
 				frm.set_value("ihotel_profile", profile);
