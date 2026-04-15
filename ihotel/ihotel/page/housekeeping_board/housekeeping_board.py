@@ -1,4 +1,21 @@
 import frappe
+from frappe.utils import today
+
+
+ALLOWED_ROOM_STATUSES = [
+	"Available",
+	"Vacant Dirty",
+	"Occupied Dirty",
+	"Vacant Clean",
+	"Occupied Clean",
+	"Pickup",
+	"Inspected",
+	"Housekeeping",
+	"Out of Order",
+	"Out of Service",
+]
+
+OOO_STATUSES = {"Out of Order", "Out of Service"}
 
 
 @frappe.whitelist()
@@ -40,9 +57,12 @@ def get_hk_board_data():
 @frappe.whitelist()
 def update_room_status(room, status):
 	"""Update a room's housekeeping status directly from the board."""
-	allowed = ["Available", "Vacant Dirty", "Occupied Dirty", "Vacant Clean", "Occupied Clean", "Pickup", "Inspected", "Housekeeping", "Out of Order", "Out of Service"]
-	if status not in allowed:
+	if status not in ALLOWED_ROOM_STATUSES:
 		frappe.throw(frappe._("Invalid status: {0}").format(status))
+
+	# For OOO/OOS transitions from the board, keep an auditable document trail.
+	if status in OOO_STATUSES:
+		_create_or_reuse_active_ooo(room=room, status=status)
 
 	doc = frappe.get_doc("Room", room)
 	doc.status = status
@@ -57,13 +77,46 @@ def bulk_update_room_status(rooms, status):
 	if isinstance(rooms, str):
 		rooms = json.loads(rooms)
 
-	allowed = ["Available", "Vacant Dirty", "Occupied Dirty", "Vacant Clean", "Occupied Clean", "Pickup", "Inspected", "Housekeeping", "Out of Order", "Out of Service"]
-	if status not in allowed:
+	if status not in ALLOWED_ROOM_STATUSES:
 		frappe.throw(frappe._("Invalid status: {0}").format(status))
 
 	for room_name in rooms:
+		if status in OOO_STATUSES:
+			_create_or_reuse_active_ooo(room=room_name, status=status)
+
 		doc = frappe.get_doc("Room", room_name)
 		doc.status = status
 		doc.save(ignore_permissions=True)
 
 	return {"updated": len(rooms)}
+
+
+def _create_or_reuse_active_ooo(room, status):
+	"""Create and submit an active Room Out of Order record if one does not already exist."""
+	active_ooo = frappe.db.exists(
+		"Room Out of Order",
+		{
+			"room": room,
+			"status": status,
+			"docstatus": 1,
+			"from_date": ["<=", today()],
+			"to_date": [">=", today()],
+		},
+	)
+	if active_ooo:
+		return active_ooo
+
+	ooo_doc = frappe.get_doc(
+		{
+			"doctype": "Room Out of Order",
+			"room": room,
+			"status": status,
+			"from_date": today(),
+			"to_date": today(),
+			"return_status": "Available",
+			"reason": "Marked from Housekeeping Board",
+		}
+	)
+	ooo_doc.insert(ignore_permissions=True)
+	ooo_doc.submit()
+	return ooo_doc.name

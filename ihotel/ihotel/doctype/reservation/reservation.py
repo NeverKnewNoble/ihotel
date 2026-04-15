@@ -286,6 +286,62 @@ class Reservation(Document):
 
 
 @frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def search_reservations_for_check_in(doctype, txt, searchfield, start, page_len, filters):
+	"""Search eligible reservations by reservation code or guest name."""
+	search_txt = f"%{txt or ''}%"
+	return frappe.db.sql(
+		"""
+		SELECT
+			r.name,
+			COALESCE(NULLIF(r.full_name, ''), g.guest_name, '') AS guest_name
+		FROM `tabReservation` r
+		LEFT JOIN `tabGuest` g ON g.name = r.guest
+		WHERE r.status != 'cancelled'
+		  AND IFNULL(r.hotel_stay, '') = ''
+		  AND IFNULL(r.room, '') != ''
+		  AND (
+				r.name LIKE %(search_txt)s
+				OR IFNULL(r.full_name, '') LIKE %(search_txt)s
+				OR IFNULL(g.guest_name, '') LIKE %(search_txt)s
+		  )
+		ORDER BY r.modified DESC
+		LIMIT %(start)s, %(page_len)s
+		""",
+		{
+			"search_txt": search_txt,
+			"start": start,
+			"page_len": page_len,
+		},
+	)
+
+
+@frappe.whitelist()
+def get_reservation_guest_for_check_in(reservation_name):
+	"""Return and validate the guest name for reservation check-in selection."""
+	frappe.has_permission("Reservation", "read", reservation_name, throw=True)
+	guest_name, status, hotel_stay, room, guest = frappe.db.get_value(
+		"Reservation",
+		reservation_name,
+		["full_name", "status", "hotel_stay", "room", "guest"],
+	) or (None, None, None, None, None)
+
+	if status == "cancelled":
+		frappe.throw(_("Reservation {0} is cancelled and cannot be checked in.").format(reservation_name))
+	if hotel_stay:
+		frappe.throw(_("Reservation {0} is already linked to Checked In {1}.").format(reservation_name, hotel_stay))
+	if not room:
+		frappe.throw(_("Reservation {0} must have a room assigned before check-in.").format(reservation_name))
+
+	if not guest_name:
+		guest_name = frappe.db.get_value("Guest", guest, "guest_name") if guest else None
+		if not guest_name:
+			frappe.throw(_("Reservation {0} does not have a guest name.").format(reservation_name))
+
+	return {"guest_name": guest_name}
+
+
+@frappe.whitelist()
 def create_proforma_invoice(reservation_name):
 	"""Create a draft Sales Invoice (proforma) for the reservation.
 	Requires write access to the Reservation. Permission-bypass inserts are logged with actor.
