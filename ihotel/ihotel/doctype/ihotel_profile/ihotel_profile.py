@@ -48,11 +48,15 @@ class iHotelProfile(Document):
 				pass
 
 	def post_charge(self, charge_type, description, rate, quantity=1,
-	                reference_doctype=None, reference_name=None):
-		"""Append a charge line to this folio and save."""
+	                reference_doctype=None, reference_name=None, charge_date=None):
+		"""Append a charge line to this folio and save.
+
+		charge_date defaults to today when not provided. Pass a specific date
+		(e.g. the check-in date or an audit date) to back/forward-date a charge.
+		"""
 		ensure_default_charge_types()
 		self.append("charges", {
-			"charge_date": nowdate(),
+			"charge_date": charge_date or nowdate(),
 			"charge_type": charge_type,
 			"description": description,
 			"quantity": quantity,

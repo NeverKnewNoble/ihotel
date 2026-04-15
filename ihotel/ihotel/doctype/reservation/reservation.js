@@ -39,9 +39,11 @@ frappe.ui.form.on("Reservation", {
 			return { filters: { customer_type: "Company" } };
 		});
 
-		// Room filter by room_type, excluding permanently unavailable rooms
+		// Room filter: only show rooms that are ready to sell (Available,
+		// Vacant Clean, or Inspected). Prevents front desk from booking rooms
+		// that are occupied, dirty, being cleaned, or out of service.
 		frm.set_query("room", function () {
-			let filters = { status: ["not in", ["Out of Order", "Out of Service"]] };
+			let filters = { status: ["in", ["Available", "Vacant Clean", "Inspected"]] };
 			if (frm.doc.room_type) filters["room_type"] = frm.doc.room_type;
 			return { filters };
 		});

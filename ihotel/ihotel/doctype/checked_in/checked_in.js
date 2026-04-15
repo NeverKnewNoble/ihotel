@@ -523,6 +523,9 @@ function ci_set_rate_line_room_type_default(frm) {
 }
 
 function setup_room_query(frm) {
+	// Only show rooms that are ready to sell (Available, Vacant Clean, or
+	// Inspected). Prevents the front desk from assigning a room that is
+	// occupied, dirty, being cleaned, or out of service.
 	frm.set_query("room", function() {
 		if (frm.doc.room_type) {
 			return {
@@ -531,7 +534,7 @@ function setup_room_query(frm) {
 			};
 		}
 		return {
-			filters: { status: ["not in", ["Occupied", "Vacant Dirty", "Occupied Dirty", "Out of Order", "Out of Service"]] },
+			filters: { status: ["in", ["Available", "Vacant Clean", "Inspected"]] },
 		};
 	});
 }
