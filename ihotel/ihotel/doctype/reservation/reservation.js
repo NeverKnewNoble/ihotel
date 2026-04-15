@@ -58,6 +58,18 @@ frappe.ui.form.on("Reservation", {
 			// 2. Convert to Checked In
 			if (frm.doc.status !== "cancelled" && !frm.doc.hotel_stay) {
 				frm.add_custom_button(__("Convert to Checked In"), function () {
+					// Stay (Checked In) requires a concrete room; avoid opaque "Value missing" server error.
+					if (!frm.doc.room) {
+						frappe.msgprint({
+							title: __("Room Required"),
+							message: __(
+								"Assign a Room Number on this reservation before converting. " +
+									"Room Type alone is not enough — choose an available room in the Room field."
+							),
+							indicator: "red",
+						});
+						return;
+					}
 					frappe.call({
 						method: "ihotel.ihotel.doctype.reservation.reservation.convert_to_hotel_stay",
 						args: { reservation_name: frm.doc.name },
