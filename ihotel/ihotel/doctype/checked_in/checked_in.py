@@ -6,7 +6,7 @@ import frappe
 from frappe.model.document import Document
 from frappe import _
 from datetime import datetime, timedelta
-from frappe.utils import get_datetime
+from frappe.utils import get_datetime, getdate
 
 
 def _resolve_default_customer_group(settings):
@@ -515,7 +515,10 @@ class CheckedIn(Document):
             check_out = get_datetime(self.expected_check_out)
             if checked_in >= check_out:
                 frappe.throw(_("Check-in date must be before check-out date"))
-            if (check_out - checked_in).days < 1:
+            # Use calendar dates (not timedelta.days) so a stay like Apr-8 14:00 → Apr-9 11:00
+            # (21 hours, but one hotel night) correctly passes the minimum-stay check.
+            calendar_nights = (getdate(self.expected_check_out) - getdate(self.expected_check_in)).days
+            if calendar_nights < 1:
                 frappe.throw(_("Minimum stay is 1 night."))
 
         if self.is_new() and self.expected_check_in:
@@ -722,26 +725,16 @@ class CheckedIn(Document):
 
         from frappe.utils import flt, nowdate
 
-        # When no_post is set, room charges are blocked — only post additional services and deposits
-        no_post = frappe.db.get_value("Checked In", self.name, "no_post") or self.no_post
+        # Room charges are NOT posted at check-in in the nightly billing model.
+        # Night Audit is responsible for posting exactly one room charge per guest per night.
+        # This keeps all room revenue tied to audit dates and prevents double-billing.
 
-        # Post each rate line as a folio charge (skipped when no_post is enabled)
-        if not no_post:
-            for rl in (self.rate_lines or []):
-                if not flt(rl.amount):
-                    continue
-                profile.post_charge(
-                    charge_type="Room Charge",
-                    description=rl.description or _("Rate Charge"),
-                    rate=flt(rl.amount),
-                    quantity=1,
-                    reference_doctype="Checked In",
-                    reference_name=self.name,
-                )
-        else:
+        # no_post flag is still respected: if set, night audit will also skip this stay.
+        no_post = frappe.db.get_value("Checked In", self.name, "no_post") or self.no_post
+        if no_post:
             frappe.log_error(
                 title=f"iHotel: No Post active for {self.name}",
-                message=f"Room charges skipped at folio creation because no_post=1 on stay {self.name}."
+                message=f"Stay {self.name} has no_post=1. Night audit will skip room charges for this stay."
             )
 
         # Post each additional service as a folio charge

@@ -10,7 +10,7 @@
   "customer",
   "contact_person",
   "column_break_lo1",
-  "reservation_id",
+  "checked_in",
   "room_number",
   "contact_mobile",
   "section_break_lo2",
@@ -71,9 +71,11 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "reservation_id",
-   "fieldtype": "Data",
-   "label": "Reservation ID"
+   "fieldname": "checked_in",
+   "fieldtype": "Link",
+   "label": "Checked In Stay",
+   "options": "Checked In",
+   "description": "Select the active hotel stay to auto-fill room, guest, and folio details."
   },
   {
    "fieldname": "room_number",

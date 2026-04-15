@@ -15,7 +15,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Group",
-   "options": "Smoking\nFloor\nRoom Features\nSpecials\nInterests",
+   "options": "Smoking\nNon-smoking\nFloor\nRoom Features\nSpecials\nInterests",
    "reqd": 1
   },
   {
