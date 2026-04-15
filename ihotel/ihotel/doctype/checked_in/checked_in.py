@@ -522,7 +522,7 @@ class CheckedIn(Document):
                 frappe.throw(_("Minimum stay is 1 night."))
 
         if self.is_new() and self.expected_check_in:
-            from frappe.utils import getdate, nowdate
+            from frappe.utils import nowdate
             if getdate(self.expected_check_in) < getdate(nowdate()):
                 allow_past = frappe.db.get_single_value("iHotel Settings", "allow_past_dates")
                 if not allow_past:
