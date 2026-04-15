@@ -427,6 +427,14 @@ def convert_to_hotel_stay(reservation_name):
 			reservation.hotel_stay
 		))
 
+	# Checked In requires a specific Room (not only Room Type). Assign before convert.
+	if not reservation.room:
+		frappe.throw(
+			_("Please assign a Room Number on this reservation before converting to a check-in. "
+			  "Room Type alone is not enough — pick an available room from the Room field."),
+			title=_("Room Required"),
+		)
+
 	# Use linked Guest profile or look up / create from full_name
 	guest = reservation.guest
 	if not guest and reservation.full_name:

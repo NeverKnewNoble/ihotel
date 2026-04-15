@@ -141,6 +141,19 @@ class TestReservationPaymentValidation(FrappeTestCase):
 
 	# ── no_post propagation ───────────────────────────────────────────────────
 
+	def test_convert_to_hotel_stay_requires_room(self):
+		"""Converting without a Room must fail with a clear message (Checked In.room is mandatory)."""
+		from ihotel.ihotel.doctype.reservation.reservation import convert_to_hotel_stay
+
+		res = _make_base_reservation(self.suffix, None, self.rt.name, self.guest.name)
+		res.insert(ignore_permissions=True)
+		try:
+			with self.assertRaises(frappe.ValidationError) as ctx:
+				convert_to_hotel_stay(res.name)
+			self.assertIn("Room", str(ctx.exception))
+		finally:
+			frappe.delete_doc("Reservation", res.name, ignore_permissions=True, force=True)
+
 	def test_no_post_propagated_to_hotel_stay(self):
 		"""
 		When a Reservation has no_post=1, the converted Checked In record
