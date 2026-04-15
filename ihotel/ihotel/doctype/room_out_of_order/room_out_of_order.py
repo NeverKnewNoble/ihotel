@@ -24,15 +24,23 @@ class RoomOutofOrder(Document):
 					"Room {0} has an active guest stay and cannot be placed Out of Order."
 				).format(self.room))
 
+	def on_update(self):
+		# Keep room status aligned immediately when an active OOO/OOS record is created or edited.
+		if self.docstatus in (0, 1):
+			self._apply_status_if_active_period()
+
 	def on_submit(self):
-		today_date = getdate(today())
-		if getdate(self.from_date) <= today_date <= getdate(self.to_date):
-			self._set_room_status(self.status)
+		self._apply_status_if_active_period()
 
 	def on_cancel(self):
 		today_date = getdate(today())
 		if getdate(self.from_date) <= today_date <= getdate(self.to_date):
 			self._set_room_status(self.return_status or "Available")
+
+	def _apply_status_if_active_period(self):
+		today_date = getdate(today())
+		if getdate(self.from_date) <= today_date <= getdate(self.to_date):
+			self._set_room_status(self.status)
 
 	def _set_room_status(self, status):
 		room = frappe.get_doc("Room", self.room)

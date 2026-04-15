@@ -10,20 +10,46 @@ function _show_check_in_from_reservation_dialog(on_success) {
 				label: __("Reservation"),
 				options: "Reservation",
 				reqd: 1,
-				// Only reservations that have a concrete room and haven't been converted yet
+				change() {
+					const reservation = d.get_value("reservation");
+					if (!reservation) {
+						d.set_value("guest_name", "");
+						return;
+					}
+					frappe.call({
+						method: "ihotel.ihotel.doctype.reservation.reservation.get_reservation_guest_for_check_in",
+						args: { reservation_name: reservation },
+						callback(r) {
+							const payload = r.message || {};
+							d.set_value("guest_name", payload.guest_name || "");
+						},
+					});
+				},
+				// Supports search by reservation code or guest name while keeping
+				// the same eligibility rules used for front-desk check-in.
 				get_query() {
 					return {
-						filters: [
-							["status", "not in", ["cancelled"]],
-							["hotel_stay", "=", ""],
-							["room", "!=", ""],
-						],
+						query: "ihotel.ihotel.doctype.reservation.reservation.search_reservations_for_check_in",
 					};
 				},
+			},
+			{
+				fieldtype: "Data",
+				fieldname: "guest_name",
+				label: __("Guest Name"),
+				read_only: 1,
 			},
 		],
 		primary_action_label: __("Check In"),
 		primary_action(values) {
+			if (!values.guest_name) {
+				frappe.msgprint({
+					title: __("Guest Not Found"),
+					message: __("Enter a valid reservation code to load and verify the guest name before check-in."),
+					indicator: "red",
+				});
+				return;
+			}
 			d.hide();
 			frappe.call({
 				method: "ihotel.ihotel.doctype.reservation.reservation.convert_to_hotel_stay",
