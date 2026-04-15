@@ -361,8 +361,10 @@ def get_rooms_for_room_type(doctype, txt, searchfield, start, page_len, filters)
 		conditions.append("room_type = %s")
 		values.append(room_type)
 
-	# Exclude rooms that are not available
-	conditions.append("status NOT IN ('Out of Order', 'Out of Service', 'Occupied', 'Vacant Dirty', 'Occupied Dirty')")
+	# Only show rooms that are ready to sell (Available, Vacant Clean, or
+	# Inspected). Prevents the front desk from assigning a room that is
+	# occupied, dirty, being cleaned, or out of service.
+	conditions.append("status IN ('Available', 'Vacant Clean', 'Inspected')")
 
 	where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
@@ -591,8 +593,10 @@ class CheckedIn(Document):
         self.total_charges = round(rate_lines_total + svc_total, 2)
         self.tax           = self._compute_tax(self.total_charges)
         self.total_amount  = round(self.total_charges + self.tax, 2)
-        # Keep room_rate in sync as nightly rate (used by extend_stay)
-        self.room_rate = round(self.total_charges / (nights or 1), 2)
+        # room_rate = the per-night price (sum of rate line amounts after discounts).
+        # Rate line amounts already represent the nightly rate — do NOT divide by nights,
+        # as that would give a fractional rate when total_charges is the per-night total.
+        self.room_rate = rate_lines_total
 
     def _compute_tax(self, net_total):
         """Compute tax from the first rate_line's Rate Type tax_schedule."""
@@ -725,19 +729,32 @@ class CheckedIn(Document):
 
         from frappe.utils import flt, nowdate
 
-        # Room charges are NOT posted at check-in in the nightly billing model.
-        # Night Audit is responsible for posting exactly one room charge per guest per night.
-        # This keeps all room revenue tied to audit dates and prevents double-billing.
-
-        # no_post flag is still respected: if set, night audit will also skip this stay.
         no_post = frappe.db.get_value("Checked In", self.name, "no_post") or self.no_post
-        if no_post:
+
+        # ── First-night room charge ───────────────────────────────────────────
+        # Post the first night immediately so the folio is never empty at check-in.
+        # Night Audit posts subsequent nights; its duplicate guard skips this date.
+        rate_lines_total = round(sum(flt(r.amount) for r in (self.rate_lines or [])), 2)
+        if not no_post and rate_lines_total > 0:
+            check_in_date = getdate(self.actual_check_in or self.expected_check_in)
+            profile.post_charge(
+                charge_type="Room Charge",
+                description=_("Nightly room charge — Room {0} ({1})").format(
+                    self.room or "", check_in_date
+                ),
+                rate=rate_lines_total,
+                quantity=1,
+                reference_doctype="Checked In",
+                reference_name=self.name,
+                charge_date=check_in_date,
+            )
+        elif no_post:
             frappe.log_error(
                 title=f"iHotel: No Post active for {self.name}",
-                message=f"Stay {self.name} has no_post=1. Night audit will skip room charges for this stay."
+                message=f"Stay {self.name} has no_post=1. Room charges are blocked at check-in and night audit."
             )
 
-        # Post each additional service as a folio charge
+        # ── Additional services ──────────────────────────────────────────────
         for svc in (self.additional_services or []):
             if flt(svc.amount) == 0:
                 continue
@@ -750,35 +767,14 @@ class CheckedIn(Document):
                 reference_name=self.name,
             )
 
-        # Post payment row from reservation billing method (or deposit if collected)
-        if getattr(self, "deposit_method", None):
-            if flt(self.deposit_amount) > 0:
-                # Deposit was collected — mark as paid
-                profile.append("payments", {
-                    "date": nowdate(),
-                    "payment_method": self.deposit_method,
-                    "detail": self.payment_detail or _("Deposit collected at check-in"),
-                    "rate": flt(self.deposit_amount),
-                    "payment_status": "Paid",
-                })
-            else:
-                # No deposit collected — pre-fill the expected billing method as pending
-                expected_amount = flt(self.total_amount) or flt(self.total_charges) or 0
-                if expected_amount > 0:
-                    profile.append("payments", {
-                        "date": nowdate(),
-                        "payment_method": self.deposit_method,
-                        "detail": self.payment_detail or _("Guaranteed billing method"),
-                        "rate": expected_amount,
-                        "payment_status": "Pending payment",
-                    })
-            profile.save(ignore_permissions=True)
-        elif flt(self.deposit_amount) > 0:
-            # Fallback: deposit with no method recorded
+        # ── Deposit / payment recording ──────────────────────────────────────
+        # Only record actual collected deposits. Do NOT pre-fill a "Pending payment"
+        # placeholder — it creates a false balance before charges are posted.
+        if flt(self.deposit_amount) > 0:
             profile.append("payments", {
                 "date": nowdate(),
-                "payment_method": "Cash",
-                "detail": _("Deposit collected at check-in"),
+                "payment_method": self.deposit_method or "Cash",
+                "detail": self.payment_detail or _("Deposit collected at check-in"),
                 "rate": flt(self.deposit_amount),
                 "payment_status": "Paid",
             })
