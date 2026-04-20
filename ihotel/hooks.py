@@ -10,7 +10,7 @@ app_license = "mit"
 fixtures = [
 	{"doctype": "Business Source Type", "filters": [["module" , "in" , ("ihotel" )]]},
 	{"doctype": "Business Channel Category", "filters": [["module" , "in" , ("ihotel" )]]},
-	{"doctype": "Notification", "filters": [["name", "=", "Reservation Confirmation Letter"]]},
+	{"doctype": "Notification", "filters": [["name", "in", ["Reservation Confirmation Letter", "Reservation Unconfirmation Letter"]]]},
 	{"doctype": "Workspace Sidebar", "filters": [["name", "=", "iHotel"]]},
 ]
 

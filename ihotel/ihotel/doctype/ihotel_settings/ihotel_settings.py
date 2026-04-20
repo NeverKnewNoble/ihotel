@@ -43,3 +43,31 @@ class iHotelSettings(Document):
 			frappe.throw(
 				_("Default Customer Group must be a non-group (leaf) Customer Group, for example Individual.")
 			)
+
+
+def resolve_income_account(charge_type, company=None):
+	"""Look up the ERPXpand income account for a folio Charge Type from iHotel Settings.
+
+	Priority:
+	1. Exact Settings row: charge_type + company match.
+	2. Settings row for charge_type with blank company (applies to any company).
+	3. None — caller falls back to other mechanisms (e.g. Charge Type master's own mapping).
+	"""
+	if not charge_type:
+		return None
+
+	settings = frappe.get_single("iHotel Settings")
+	rows = settings.get("income_accounts", [])
+	if not rows:
+		return None
+
+	company = company or settings.get("company")
+
+	for row in rows:
+		if row.charge_type == charge_type and row.company and row.company == company:
+			return row.account
+	for row in rows:
+		if row.charge_type == charge_type and not row.company:
+			return row.account
+
+	return None

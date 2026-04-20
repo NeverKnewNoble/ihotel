@@ -156,7 +156,7 @@ frappe.pages["room_board"].on_page_show = function (wrapper) {
 };
 
 // Statuses where a room is ready to accept a walk-in
-const CHECK_IN_READY = new Set(["Available", "Inspected", "Pickup", "Vacant Clean"]);
+const CHECK_IN_READY = new Set(["Available", "Inspected", "Pickup", "Vacant Clean", "Vacant Dirty"]);
 
 class RoomBoard {
 	constructor(page) {
@@ -202,11 +202,11 @@ class RoomBoard {
 			window.location.href = $(e.currentTarget).data("href");
 		});
 
-		// Check-in button
+		// Check-in button — first ask whether it's a walk-in or from a reservation
 		this.$grid.on("click", ".rb-checkin-btn", (e) => {
 			e.stopPropagation();
 			const room_name = $(e.currentTarget).data("room");
-			this.show_check_in_dialog(this.room_map[room_name]);
+			this.show_checkin_mode_picker(this.room_map[room_name]);
 		});
 
 		this.refresh();
@@ -360,6 +360,111 @@ class RoomBoard {
 		this.$grid.html(`<div class="rb-grid">${cards}</div>`);
 	}
 
+	show_checkin_mode_picker(room) {
+		const d = new frappe.ui.Dialog({
+			title: `Check In — Room ${frappe.utils.escape_html(room.room_number || room.name)}`,
+			fields: [{ fieldtype: "HTML", fieldname: "mode_picker" }],
+			primary_action_label: __("Continue"),
+			primary_action: () => {
+				const mode = d.$wrapper.find('input[name="rb-ci-mode"]:checked').val();
+				d.hide();
+				if (mode === "reservation") {
+					this.show_reservation_check_in_dialog(room);
+				} else {
+					this.show_check_in_dialog(room);
+				}
+			},
+		});
+		d.fields_dict.mode_picker.$wrapper.html(`
+			<div class="rb-mode-picker" style="padding:4px 0 8px 0;">
+				<label style="display:block; padding:10px 12px; border:1px solid var(--border-color); border-radius:6px; margin-bottom:8px; cursor:pointer;">
+					<input type="radio" name="rb-ci-mode" value="walkin" checked style="margin-right:8px;">
+					<strong>${__("Walk-in / New Check-in")}</strong>
+					<div style="color: var(--text-muted); font-size: 0.85em; margin-left:22px;">
+						${__("Create a new stay for a guest without a reservation.")}
+					</div>
+				</label>
+				<label style="display:block; padding:10px 12px; border:1px solid var(--border-color); border-radius:6px; cursor:pointer;">
+					<input type="radio" name="rb-ci-mode" value="reservation" style="margin-right:8px;">
+					<strong>${__("From existing Reservation")}</strong>
+					<div style="color: var(--text-muted); font-size: 0.85em; margin-left:22px;">
+						${__("Convert a Reservation into a checked-in stay for this room.")}
+					</div>
+				</label>
+			</div>
+		`);
+		d.show();
+	}
+
+	show_reservation_check_in_dialog(room) {
+		const target_room = room.name;
+		const d = new frappe.ui.Dialog({
+			title: __("Check In from Reservation — Room {0}", [room.room_number || room.name]),
+			fields: [
+				{
+					fieldtype: "Link",
+					fieldname: "reservation",
+					label: __("Reservation"),
+					options: "Reservation",
+					reqd: 1,
+					change() {
+						const reservation = d.get_value("reservation");
+						if (!reservation) {
+							d.set_value("guest_name", "");
+							return;
+						}
+						frappe.call({
+							method: "ihotel.ihotel.doctype.reservation.reservation.get_reservation_guest_for_check_in",
+							args: { reservation_name: reservation },
+							callback(r) {
+								d.set_value("guest_name", (r.message || {}).guest_name || "");
+							},
+						});
+					},
+					get_query() {
+						return {
+							query: "ihotel.ihotel.doctype.reservation.reservation.search_reservations_for_check_in",
+						};
+					},
+				},
+				{
+					fieldtype: "Data",
+					fieldname: "guest_name",
+					label: __("Guest Name"),
+					read_only: 1,
+				},
+			],
+			primary_action_label: __("Check In"),
+			primary_action: (values) => {
+				if (!values.guest_name) {
+					frappe.msgprint({
+						title: __("Guest Not Found"),
+						message: __("Enter a valid reservation code to load and verify the guest name before check-in."),
+						indicator: "red",
+					});
+					return;
+				}
+				d.hide();
+				frappe.call({
+					method: "ihotel.ihotel.doctype.reservation.reservation.convert_to_hotel_stay",
+					args: { reservation_name: values.reservation, override_room: target_room },
+					freeze: true,
+					freeze_message: __("Converting reservation to check-in…"),
+					callback: (r) => {
+						if (r.message) {
+							frappe.show_alert({
+								message: __("Guest checked in successfully."),
+								indicator: "green",
+							}, 5);
+							frappe.set_route("Form", "Checked In", r.message);
+						}
+					},
+				});
+			},
+		});
+		d.show();
+	}
+
 	show_check_in_dialog(room) {
 		const rack_rate = room.rack_rate || 0;
 
@@ -456,6 +561,7 @@ class RoomBoard {
 					fieldname: "rate_type",
 					label: "Rate Type",
 					options: "Rate Type",
+					reqd: 1,
 					onchange: function () {
 						resolve_rate(d, room);
 					},
@@ -476,6 +582,10 @@ class RoomBoard {
 					fieldname: "rate_info",
 					options: "",
 				},
+				// Hidden fields populated by resolve_rate so the backend can build a full rate_line
+				// (rate_type + rate_column + description) and compute tax from the tax schedule.
+				{ fieldtype: "Data", fieldname: "rate_column",      hidden: 1 },
+				{ fieldtype: "Data", fieldname: "rate_description", hidden: 1 },
 
 				// ── Other ─────────────────────────────────────────────────
 				{
@@ -505,8 +615,10 @@ class RoomBoard {
 						guest: values.guest,
 						expected_check_in: values.expected_check_in,
 						expected_check_out: values.expected_check_out,
+						rate_type: values.rate_type,
 						room_rate: values.room_rate,
-						rate_type: values.rate_type || null,
+						rate_column: values.rate_column || null,
+						rate_description: values.rate_description || null,
 						adults: values.adults || 1,
 						children: values.children || 0,
 						business_source: values.business_source || null,
@@ -558,17 +670,29 @@ function resolve_rate(d, room) {
 	const adults      = d.get_value("adults") || 1;
 
 	frappe.db.get_doc("Rate Type", rate_type).then(rate => {
-		// Resolve rate from schedule
-		let resolved = null;
+		// Find the first matching schedule row (by room_type + date range), then pick
+		// the per-night rate column based on occupancy — same logic as the Checked In form.
+		let matched = null;
 		if (rate.rate_schedule && rate.rate_schedule.length) {
 			for (const row of rate.rate_schedule) {
 				const type_match = !row.room_type || row.room_type === room.room_type;
 				const in_range   = (!row.from_date || row.from_date <= check_date) &&
 				                   (!row.to_date   || row.to_date   >= check_date);
-				if (type_match && in_range && row.rate) {
-					resolved = row.rate;
+				if (type_match && in_range) {
+					matched = row;
 					break;
 				}
+			}
+		}
+
+		let resolved = null;
+		let rate_column = "Single / Base Rate";
+		if (matched) {
+			if (adults > 1 && matched.double_rate) {
+				resolved = matched.double_rate;
+				rate_column = "Double Rate";
+			} else {
+				resolved = matched.rate || rate.base_rate || 0;
 			}
 		}
 		if (!resolved && rate.base_rate) resolved = rate.base_rate;
@@ -579,6 +703,8 @@ function resolve_rate(d, room) {
 		}
 
 		if (resolved) d.set_value("room_rate", resolved);
+		d.set_value("rate_column", rate_column);
+		d.set_value("rate_description", rate.rate_type_name || rate.name);
 
 		// Build info badge
 		const badges = [];

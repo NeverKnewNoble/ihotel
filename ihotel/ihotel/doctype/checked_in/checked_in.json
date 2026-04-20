@@ -8,6 +8,7 @@
  "engine": "InnoDB",
  "field_order": [
   "guest",
+  "column_break_jzbl",
   "section_break_uvsf",
   "room_type",
   "expected_check_in",
@@ -363,17 +364,21 @@
   {
    "fieldname": "section_break_xjeh",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_jzbl",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-28 20:53:30.483971",
+ "modified": "2026-04-19 23:05:07.096361",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Checked In",
- "naming_rule": "Expression (using Naming Series)",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {

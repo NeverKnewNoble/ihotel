@@ -55,11 +55,27 @@ def get_room_board_data():
 
 @frappe.whitelist()
 def quick_check_in(
-	room, guest, expected_check_in, expected_check_out, room_rate,
-	rate_type=None, adults=1, children=0, business_source=None, deposit_amount=0
+	room, guest, expected_check_in, expected_check_out,
+	rate_type, room_rate, rate_column=None, rate_description=None,
+	adults=1, children=0, business_source=None, deposit_amount=0
 ):
-	"""Create and submit a Checked In document directly from the Room Board."""
+	"""Create and submit a Checked In document directly from the Room Board.
+
+	Builds a rate_lines row so Checked In.calculate_total_amount computes tax
+	and totals from the Rate Type's tax_schedule — matching the behavior of
+	creating a Checked In record via the DocType form.
+	"""
 	room_doc = frappe.get_doc("Room", room)
+	rate_val = flt(room_rate)
+
+	rate_line = {
+		"rate_type":   rate_type,
+		"room_type":   room_doc.room_type,
+		"rate_column": rate_column or "Single / Base Rate",
+		"description": rate_description or rate_type,
+		"rate":        rate_val,
+		"amount":      rate_val,
+	}
 
 	doc = frappe.get_doc({
 		"doctype": "Checked In",
@@ -69,12 +85,12 @@ def quick_check_in(
 		"expected_check_in": expected_check_in,
 		"actual_check_in": now_datetime(),
 		"expected_check_out": expected_check_out,
-		"room_rate": flt(room_rate),
 		"status": "Checked In",
 		"adults": int(adults or 1),
 		"children": int(children or 0),
 		"business_source": business_source or None,
 		"deposit_amount": flt(deposit_amount or 0),
+		"rate_lines": [rate_line],
 	})
 	doc.insert(ignore_permissions=True)
 	doc.submit()
