@@ -471,7 +471,7 @@ def create_proforma_invoice(reservation_name):
 
 
 @frappe.whitelist()
-def convert_to_hotel_stay(reservation_name):
+def convert_to_hotel_stay(reservation_name, override_room=None):
 	frappe.has_permission("Reservation", "write", reservation_name, throw=True)
 	reservation = frappe.get_doc("Reservation", reservation_name)
 
@@ -482,6 +482,15 @@ def convert_to_hotel_stay(reservation_name):
 		frappe.throw(_("This reservation has already been converted to Checked In: {0}").format(
 			reservation.hotel_stay
 		))
+
+	# Caller (e.g. Room Board) may pin the reservation to a different room before convert.
+	# Also sync room_type so rate lines / folio / reports stay coherent.
+	if override_room and override_room != reservation.room:
+		reservation.db_set("room", override_room)
+		new_room_type = frappe.db.get_value("Room", override_room, "room_type")
+		if new_room_type and new_room_type != reservation.room_type:
+			reservation.db_set("room_type", new_room_type)
+		reservation.reload()
 
 	# Checked In requires a specific Room (not only Room Type). Assign before convert.
 	if not reservation.room:

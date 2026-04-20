@@ -538,23 +538,21 @@ class CheckedIn(Document):
         if not self.room or self.status not in ["Reserved", "Checked In"]:
             return
 
-        # Block rooms that are not available
-        room_status = frappe.get_value("Room", self.room, "status")
-        if room_status in ("Out of Order", "Out of Service", "Occupied", "Vacant Dirty", "Occupied Dirty"):
+        # Read status directly from DB to avoid Frappe's document cache,
+        # which can hold a stale value after raw db.set_value updates elsewhere
+        # (e.g. move_room, night audit).
+        row = frappe.db.sql(
+            "SELECT status FROM `tabRoom` WHERE name=%s", self.room, as_dict=True
+        )
+        room_status = row[0].status if row else None
+
+        # Block rooms that are physically unavailable for a new stay.
+        # Vacant Dirty is intentionally allowed — the room is free, housekeeping will clean before guest goes up.
+        UNAVAILABLE = ("Out of Order", "Out of Service", "Occupied", "Occupied Dirty", "Occupied Clean")
+        if room_status in UNAVAILABLE:
             frappe.throw(
                 _("Room {0} is {1} and cannot be booked.").format(self.room, room_status)
             )
-
-        # For immediate check-ins the room must be physically ready
-        if self.status == "Checked In":
-            READY_STATUSES = {"Available", "Pickup", "Inspected", "Vacant Clean"}
-            if room_status not in READY_STATUSES:
-                frappe.throw(
-                    _("Room {0} is not ready for check-in (current status: {1}). "
-                      "Only Available, Pickup, or Inspected rooms can be checked into.").format(
-                        self.room, room_status
-                    )
-                )
 
         # Check for overlapping stays (runs for both Reserved and Checked In)
         if self.expected_check_in and self.expected_check_out:
@@ -734,15 +732,19 @@ class CheckedIn(Document):
         # ── First-night room charge ───────────────────────────────────────────
         # Post the first night immediately so the folio is never empty at check-in.
         # Night Audit posts subsequent nights; its duplicate guard skips this date.
+        # Charge is posted tax-inclusive so the folio's Total Charges matches the
+        # stay's Total (incl. Tax) — tax is computed from the rate_lines[0].rate_type tax_schedule.
         rate_lines_total = round(sum(flt(r.amount) for r in (self.rate_lines or [])), 2)
         if not no_post and rate_lines_total > 0:
             check_in_date = getdate(self.actual_check_in or self.expected_check_in)
+            nightly_tax = self._compute_tax(rate_lines_total)
+            nightly_total_incl_tax = round(rate_lines_total + nightly_tax, 2)
             profile.post_charge(
                 charge_type="Room Charge",
                 description=_("Nightly room charge — Room {0} ({1})").format(
                     self.room or "", check_in_date
                 ),
-                rate=rate_lines_total,
+                rate=nightly_total_incl_tax,
                 quantity=1,
                 reference_doctype="Checked In",
                 reference_name=self.name,
@@ -1019,11 +1021,10 @@ class CheckedIn(Document):
     def _build_sales_invoice(self, profile, customer, company, settings):
         """Build, insert and submit a Sales Invoice from the folio charges."""
         from frappe.utils import flt, nowdate
+        from ihotel.ihotel.doctype.ihotel_settings.ihotel_settings import resolve_income_account
 
         room_item  = settings.get("room_charge_item")
         extra_item = settings.get("extra_charge_item")
-        room_acct  = settings.get("room_revenue_account")
-        extra_acct = settings.get("extra_charges_income_account")
 
         invoice = frappe.new_doc("Sales Invoice")
         invoice.customer  = customer
@@ -1040,6 +1041,9 @@ class CheckedIn(Document):
             and settings.get("post_room_revenue_via_night_audit_je")
         )
 
+        # Per-charge-type income account resolution. Room Charge and any other
+        # charge type (F&B, Laundry, Spa, Minibar, …) pick their credit account
+        # from the Income Accounts table on iHotel Settings — keyed by charge_type.
         for charge in profile.charges:
             if skip_room_on_invoice and charge.charge_type == "Room Charge":
                 continue
@@ -1054,7 +1058,7 @@ class CheckedIn(Document):
                 "qty": flt(charge.quantity) or 1,
                 "rate": flt(charge.rate),
             }
-            acct = room_acct if is_room else extra_acct
+            acct = resolve_income_account(charge.charge_type, company)
             if acct:
                 row["income_account"] = acct
             invoice.append("items", row)

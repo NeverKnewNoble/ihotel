@@ -106,11 +106,52 @@ class Guest(Document):
 			db_customer = frappe.db.get_value("Guest", self.name, "customer")
 
 			if db_customer:
-				# Guest already linked — check if name changed (rename scenario)
-				current_name = frappe.db.get_value("Customer", db_customer, "customer_name")
-				if current_name and current_name != self.guest_name:
-					frappe.db.set_value("Customer", db_customer, "customer_name", self.guest_name,
-					                    update_modified=False)
+				# Guest already linked — keep key fields in sync with the Guest record
+				# (name on rename, gender when set/changed, billing currency if missing,
+				# the SO/DN bypass flags front-desk billing needs, and the debtors account
+				# row under Accounting).
+				cust_values = frappe.db.get_value(
+					"Customer", db_customer,
+					["customer_name", "gender", "default_currency", "so_required", "dn_required"],
+					as_dict=True,
+				) or {}
+
+				settings = frappe.get_single("iHotel Settings")
+
+				updates = {}
+				if cust_values.get("customer_name") and cust_values["customer_name"] != self.guest_name:
+					updates["customer_name"] = self.guest_name
+				if self.gender and cust_values.get("gender") != self.gender:
+					updates["gender"] = self.gender
+				if not cust_values.get("default_currency"):
+					hotel_currency = settings.get("currency")
+					if hotel_currency:
+						updates["default_currency"] = hotel_currency
+				if not cust_values.get("so_required"):
+					updates["so_required"] = 1
+				if not cust_values.get("dn_required"):
+					updates["dn_required"] = 1
+
+				if updates:
+					frappe.db.set_value("Customer", db_customer, updates, update_modified=False)
+
+				# Backfill the Accounts (Party Account) row if missing for this hotel's company.
+				hotel_company = settings.get("company")
+				hotel_debtors = settings.get("accounts_receivable_account")
+				if hotel_company and hotel_debtors:
+					already = frappe.db.exists("Party Account", {
+						"parent": db_customer,
+						"parenttype": "Customer",
+						"company": hotel_company,
+					})
+					if not already:
+						cust_doc = frappe.get_doc("Customer", db_customer)
+						cust_doc.append("accounts", {
+							"company": hotel_company,
+							"account": hotel_debtors,
+						})
+						cust_doc.save(ignore_permissions=True)
+
 				# Mark synced only if status wasn't already Synced (avoids redundant writes)
 				if _guest_has_field("sync_status"):
 					if frappe.db.get_value("Guest", self.name, "sync_status") != "Synced":
@@ -138,7 +179,26 @@ class Guest(Document):
 				"customer_type": "Individual",
 				"customer_group": _resolve_default_customer_group(settings),
 				"territory": settings.get("default_territory") or "All Territories",
+				# Allow front-desk billing: Sales Invoices are posted directly from the
+				# folio without a Sales Order / Delivery Note upstream.
+				# (ERPNext quirk: these field names are inverted — 1 means "allow without".)
+				"so_required": 1,
+				"dn_required": 1,
 			}
+			if self.gender:
+				customer_payload["gender"] = self.gender
+			hotel_currency = settings.get("currency")
+			if hotel_currency:
+				customer_payload["default_currency"] = hotel_currency
+			# Pin the company-level debtors account so Sales Invoices auto-post to the
+			# correct receivable account without the accountant having to re-map it.
+			hotel_company = settings.get("company")
+			hotel_debtors = settings.get("accounts_receivable_account")
+			if hotel_company and hotel_debtors:
+				customer_payload["accounts"] = [{
+					"company": hotel_company,
+					"account": hotel_debtors,
+				}]
 			if self.phone:
 				# Set both keys for compatibility with custom hooks across sites/apps.
 				mobile = str(self.phone)

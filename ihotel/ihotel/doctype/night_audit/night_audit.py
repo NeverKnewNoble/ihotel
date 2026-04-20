@@ -216,6 +216,11 @@ class NightAudit(Document):
         # Resolve mapping so configuration can be validated early by lookup.
         resolve_hotel_account_for_charge_type("Room Charge")
 
+        # Post tax-inclusive so each night's folio row matches the stay's Total (incl. Tax)
+        # and stays consistent with the first-night charge posted at check-in.
+        nightly_tax = stay_doc._compute_tax(nightly_rate)
+        nightly_total_incl_tax = round(nightly_rate + nightly_tax, 2)
+
         profile_doc.append("charges", {
             "charge_date": audit_date,
             "charge_type": "Room Charge",
@@ -223,8 +228,8 @@ class NightAudit(Document):
                 stay_doc.room or "", audit_date
             ),
             "quantity": 1,
-            "rate": nightly_rate,
-            "amount": nightly_rate,
+            "rate": nightly_total_incl_tax,
+            "amount": nightly_total_incl_tax,
             "reference_doctype": "Checked In",
             "reference_name": stay_doc.name,
         })
@@ -248,12 +253,16 @@ class NightAudit(Document):
         if frappe.db.get_value("Night Audit", self.name, "erpnext_journal_entry"):
             return
 
+        from ihotel.ihotel.doctype.ihotel_settings.ihotel_settings import resolve_income_account
+
         company = settings.company
         ar_acct = settings.accounts_receivable_account
-        rev_acct = settings.room_revenue_account
+        # Room revenue account now comes from the Income Accounts table on Settings,
+        # keyed by charge_type = "Room Charge". Supports hotels with multiple revenue streams.
+        rev_acct = resolve_income_account("Room Charge", company)
         if not all([company, ar_acct, rev_acct]):
             frappe.msgprint(
-                _("Set Company, Accounts Receivable and Room Revenue in iHotel Settings to post night audit to ERPXpand."),
+                _("Set Company, Accounts Receivable, and an Income Accounts row for 'Room Charge' in iHotel Settings to post night audit to ERPXpand."),
                 indicator="orange",
                 title=_("ERPXpand Journal Entry skipped"),
             )

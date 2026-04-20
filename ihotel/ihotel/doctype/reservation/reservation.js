@@ -72,13 +72,7 @@ frappe.ui.form.on("Reservation", {
 						});
 						return;
 					}
-					frappe.call({
-						method: "ihotel.ihotel.doctype.reservation.reservation.convert_to_hotel_stay",
-						args: { reservation_name: frm.doc.name },
-						callback(r) {
-							if (r.message) frm.reload_doc();
-						},
-					});
+					show_convert_to_checkin_dialog(frm);
 				}, __("Actions"));
 			}
 
@@ -485,4 +479,77 @@ function apply_direct_bill_rule(frm) {
 		frm.set_df_property("guarantee_type", "read_only", 0);
 		frm.set_df_property("guarantee_type", "description", "");
 	}
+}
+
+// ── Convert to Checked In: confirm-room dialog ────────────────────────────────
+// Opens a small dialog that defaults to the reservation's reserved room.
+// Staff tick "Upgrade" to swap to any other ready-to-sell room (bypassing the
+// room-type filter) before the Reservation is converted into a Checked In stay.
+function show_convert_to_checkin_dialog(frm) {
+	const reserved_room = frm.doc.room;
+	const reserved_room_type = frm.doc.room_type;
+
+	const d = new frappe.ui.Dialog({
+		title: __("Confirm Room for Check In"),
+		fields: [
+			{
+				fieldtype: "Data",
+				fieldname: "reserved_room",
+				label: __("Reserved Room"),
+				default: reserved_room,
+				read_only: 1,
+				description: reserved_room_type
+					? __("Room Type: {0}", [reserved_room_type])
+					: "",
+			},
+			{
+				fieldtype: "Check",
+				fieldname: "upgrade",
+				label: __("Upgrade — assign a different room"),
+				default: 0,
+			},
+			{
+				fieldtype: "Link",
+				fieldname: "new_room",
+				label: __("New Room"),
+				options: "Room",
+				depends_on: "eval:doc.upgrade",
+				mandatory_depends_on: "eval:doc.upgrade",
+				description: __(
+					"Only ready-to-sell rooms are shown (Available, Vacant Clean, Inspected)."
+				),
+				get_query() {
+					return {
+						filters: { status: ["in", ["Available", "Vacant Clean", "Inspected"]] },
+					};
+				},
+			},
+		],
+		primary_action_label: __("Check In"),
+		primary_action(values) {
+			const target_room = values.upgrade ? values.new_room : reserved_room;
+			if (!target_room) {
+				frappe.msgprint({
+					title: __("Room Required"),
+					message: __("Pick a room before continuing."),
+					indicator: "red",
+				});
+				return;
+			}
+			d.hide();
+			frappe.call({
+				method: "ihotel.ihotel.doctype.reservation.reservation.convert_to_hotel_stay",
+				args: {
+					reservation_name: frm.doc.name,
+					override_room: values.upgrade ? target_room : null,
+				},
+				freeze: true,
+				freeze_message: __("Converting reservation to check-in…"),
+				callback(r) {
+					if (r.message) frm.reload_doc();
+				},
+			});
+		},
+	});
+	d.show();
 }

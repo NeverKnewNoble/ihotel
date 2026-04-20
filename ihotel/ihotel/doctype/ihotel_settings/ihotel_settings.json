@@ -68,9 +68,7 @@
   "column_break_acct2",
   "accounts_receivable_account",
   "section_break_acct3",
-  "room_revenue_account",
-  "column_break_acct3",
-  "extra_charges_income_account",
+  "income_accounts",
   "section_break_acct4",
   "room_charge_item",
   "column_break_acct4",
@@ -521,23 +519,11 @@
   },
   {
    "depends_on": "eval:doc.enable_accounting_integration",
-   "description": "Credit account for room charges",
-   "fieldname": "room_revenue_account",
-   "fieldtype": "Link",
-   "label": "Room Revenue Account",
-   "options": "Account"
-  },
-  {
-   "fieldname": "column_break_acct3",
-   "fieldtype": "Column Break"
-  },
-  {
-   "depends_on": "eval:doc.enable_accounting_integration",
-   "description": "Credit account for F&B, laundry, minibar, etc.",
-   "fieldname": "extra_charges_income_account",
-   "fieldtype": "Link",
-   "label": "Extra Charges Account",
-   "options": "Account"
+   "description": "Map each Charge Type to the income (credit) account where its revenue should land. Add one row per revenue stream (Room Charge, F&B, Laundry, Minibar, Spa, etc.). Optional Company scope supports multi-property sites.",
+   "fieldname": "income_accounts",
+   "fieldtype": "Table",
+   "label": "Income Accounts",
+   "options": "iHotel Income Account"
   },
   {
    "fieldname": "section_break_acct4",
