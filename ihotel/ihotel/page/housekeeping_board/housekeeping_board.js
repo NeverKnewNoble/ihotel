@@ -25,31 +25,6 @@ frappe.pages["housekeeping-board"].on_page_load = function (wrapper) {
 					<div class="hkb-stat-label">Occupied Dirty</div>
 					<div class="hkb-stat-count" data-key="Occupied Dirty">0</div>
 				</div>
-				<div class="hkb-stat" data-status="Vacant Clean">
-					<div class="hkb-stat-dot" style="background:#34d399;"></div>
-					<div class="hkb-stat-label">Vacant Clean</div>
-					<div class="hkb-stat-count" data-key="Vacant Clean">0</div>
-				</div>
-				<div class="hkb-stat" data-status="Occupied Clean">
-					<div class="hkb-stat-dot" style="background:#60a5fa;"></div>
-					<div class="hkb-stat-label">Occupied Clean</div>
-					<div class="hkb-stat-count" data-key="Occupied Clean">0</div>
-				</div>
-				<div class="hkb-stat" data-status="Pickup">
-					<div class="hkb-stat-dot" style="background:#a855f7;"></div>
-					<div class="hkb-stat-label">Pickup</div>
-					<div class="hkb-stat-count" data-key="Pickup">0</div>
-				</div>
-				<div class="hkb-stat" data-status="Inspected">
-					<div class="hkb-stat-dot" style="background:#06b6d4;"></div>
-					<div class="hkb-stat-label">Inspected</div>
-					<div class="hkb-stat-count" data-key="Inspected">0</div>
-				</div>
-				<div class="hkb-stat" data-status="Housekeeping">
-					<div class="hkb-stat-dot" style="background:#f59e0b;"></div>
-					<div class="hkb-stat-label">Housekeeping</div>
-					<div class="hkb-stat-count" data-key="Housekeeping">0</div>
-				</div>
 				<div class="hkb-stat" data-status="Occupied">
 					<div class="hkb-stat-dot" style="background:#3b82f6;"></div>
 					<div class="hkb-stat-label">Occupied</div>
@@ -81,13 +56,9 @@ frappe.pages["housekeeping-board"].on_page_load = function (wrapper) {
 						<select class="hkb-bulk-status">
 							<option value="">Change selected to…</option>
 							<option>Available</option>
+							<option>Occupied</option>
 							<option>Vacant Dirty</option>
 							<option>Occupied Dirty</option>
-							<option>Vacant Clean</option>
-							<option>Occupied Clean</option>
-							<option>Pickup</option>
-							<option>Inspected</option>
-							<option>Housekeeping</option>
 							<option>Out of Order</option>
 							<option>Out of Service</option>
 						</select>
@@ -102,11 +73,6 @@ frappe.pages["housekeeping-board"].on_page_load = function (wrapper) {
 						<button class="hkb-pill" data-status="Available"><span class="hkb-dot" style="background:#10b981;"></span>Available <span class="hkb-pill-count">0</span></button>
 						<button class="hkb-pill" data-status="Vacant Dirty"><span class="hkb-dot" style="background:#fb923c;"></span>Vacant Dirty <span class="hkb-pill-count">0</span></button>
 						<button class="hkb-pill" data-status="Occupied Dirty"><span class="hkb-dot" style="background:#f97316;"></span>Occupied Dirty <span class="hkb-pill-count">0</span></button>
-						<button class="hkb-pill" data-status="Vacant Clean"><span class="hkb-dot" style="background:#34d399;"></span>Vacant Clean <span class="hkb-pill-count">0</span></button>
-						<button class="hkb-pill" data-status="Occupied Clean"><span class="hkb-dot" style="background:#60a5fa;"></span>Occupied Clean <span class="hkb-pill-count">0</span></button>
-						<button class="hkb-pill" data-status="Pickup"><span class="hkb-dot" style="background:#a855f7;"></span>Pickup <span class="hkb-pill-count">0</span></button>
-						<button class="hkb-pill" data-status="Inspected"><span class="hkb-dot" style="background:#06b6d4;"></span>Inspected <span class="hkb-pill-count">0</span></button>
-						<button class="hkb-pill" data-status="Housekeeping"><span class="hkb-dot" style="background:#f59e0b;"></span>Housekeeping <span class="hkb-pill-count">0</span></button>
 						<button class="hkb-pill" data-status="Occupied"><span class="hkb-dot" style="background:#3b82f6;"></span>Occupied <span class="hkb-pill-count">0</span></button>
 						<button class="hkb-pill" data-status="Out of Order"><span class="hkb-dot" style="background:#ef4444;"></span>Out of Order <span class="hkb-pill-count">0</span></button>
 						<button class="hkb-pill" data-status="Out of Service"><span class="hkb-dot" style="background:#6b7280;"></span>Out of Service <span class="hkb-pill-count">0</span></button>
@@ -264,16 +230,11 @@ class HKBoard {
 			"Occupied":       "#3b82f6",
 			"Vacant Dirty":   "#fb923c",
 			"Occupied Dirty": "#f97316",
-			"Vacant Clean":   "#34d399",
-			"Occupied Clean": "#60a5fa",
-			"Pickup":         "#a855f7",
-			"Inspected":      "#06b6d4",
-			"Housekeeping":   "#f59e0b",
 			"Out of Order":   "#ef4444",
 			"Out of Service": "#6b7280",
 		};
 
-		const status_opts = ["Available","Vacant Dirty","Occupied Dirty","Vacant Clean","Occupied Clean","Pickup","Inspected","Housekeeping","Out of Order","Out of Service"];
+		const status_opts = ["Available","Occupied","Vacant Dirty","Occupied Dirty","Out of Order","Out of Service"];
 
 		const cards = rooms.map(room => {
 			const color = colors[room.status] || "#6b7280";
@@ -333,14 +294,21 @@ class HKBoard {
 			method: "ihotel.ihotel.page.housekeeping_board.housekeeping_board.update_room_status",
 			args: { room, status },
 			callback: (r) => {
-				if (r.message) {
-					// Update in local data
-					const idx = this.all_rooms.findIndex(x => x.name === room);
-					if (idx >= 0) this.all_rooms[idx].status = status;
-					this.update_stats();
-					this.apply_filters();
-					frappe.show_alert({ message: `Room ${room} → ${status}`, indicator: "green" });
-				}
+				if (!r.message) return;
+				// Use the status the backend ACTUALLY persisted, not the requested one —
+				// Room.before_save can override (e.g. force "Occupied" when a stay is active),
+				// and previously the UI silently disagreed with the DB, making subsequent
+				// changes look like they "didn't update".
+				const saved = r.message.status;
+				const idx = this.all_rooms.findIndex(x => x.name === room);
+				if (idx >= 0) this.all_rooms[idx].status = saved;
+				this.update_stats();
+				this.apply_filters();
+				const indicator = saved === status ? "green" : "orange";
+				const msg = saved === status
+					? `Room ${room} → ${saved}`
+					: `Room ${room} → ${saved} (requested ${status} was overridden)`;
+				frappe.show_alert({ message: msg, indicator });
 			},
 		});
 	}

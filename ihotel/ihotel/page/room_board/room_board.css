@@ -202,12 +202,6 @@
 .rb-pill.active[data-status="Occupied"]       { background: #3b82f6; }
 .rb-pill.active[data-status="Vacant Dirty"]   { background: #fb923c; }
 .rb-pill.active[data-status="Occupied Dirty"] { background: #f97316; }
-.rb-pill.active[data-status="Vacant Clean"]   { background: #34d399; }
-.rb-pill.active[data-status="Occupied Clean"] { background: #60a5fa; }
-.rb-pill.active[data-status="Dirty"]          { background: #f97316; }
-.rb-pill.active[data-status="Pickup"]         { background: #a855f7; }
-.rb-pill.active[data-status="Inspected"]      { background: #06b6d4; }
-.rb-pill.active[data-status="Housekeeping"]   { background: #f59e0b; }
 .rb-pill.active[data-status="Out of Order"]   { background: #ef4444; }
 .rb-pill.active[data-status="Out of Service"] { background: #6b7280; }
 

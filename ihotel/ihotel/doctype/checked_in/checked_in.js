@@ -291,7 +291,7 @@ frappe.ui.form.on("Checked In", {
 							get_query: function () {
 								return {
 									filters: {
-										status: ["in", ["Available", "Inspected", "Vacant Clean"]],
+										status: ["in", ["Available", "Vacant Dirty"]],
 									},
 								};
 							},
@@ -366,6 +366,9 @@ frappe.ui.form.on("Checked In", {
 		(frm.doc.rate_lines || []).forEach(row => {
 			frappe.model.set_value("Stay Rate Line", row.name, "room_type", frm.doc.room_type || "");
 		});
+
+		// Auto-pick a Rate Type that's pinned to this Room Type for any blank rows.
+		auto_pick_rate_type_for_room_type(frm);
 	},
 
 	adults(frm) {
@@ -522,10 +525,33 @@ function ci_set_rate_line_room_type_default(frm) {
 	if (df) df.default = frm.doc.room_type || "";
 }
 
+// Find the first Rate Type that's pinned to this room_type and assign it to any
+// rate_lines row whose rate_type is empty. Skips rows that already have one so
+// the user's manual override is never clobbered. The fetch_rate_line trigger on
+// rate_type then resolves the per-night rate automatically.
+function auto_pick_rate_type_for_room_type(frm) {
+	if (!frm.doc.room_type) return;
+	const blank_rows = (frm.doc.rate_lines || []).filter(r => !r.rate_type);
+	if (!blank_rows.length) return;
+
+	frappe.db.get_list("Rate Type", {
+		filters: { applicable_to: "Room Type", room_type: frm.doc.room_type },
+		fields: ["name"],
+		limit: 1,
+		order_by: "modified desc",
+	}).then(rows => {
+		if (!rows || !rows.length) return;
+		const rate_type_name = rows[0].name;
+		blank_rows.forEach(row => {
+			frappe.model.set_value("Stay Rate Line", row.name, "rate_type", rate_type_name);
+		});
+	});
+}
+
 function setup_room_query(frm) {
-	// Only show rooms that are ready to sell (Available, Vacant Clean, or
-	// Inspected). Prevents the front desk from assigning a room that is
-	// occupied, dirty, being cleaned, or out of service.
+	// Only show rooms that are bookable: Available or Vacant Dirty (housekeeping
+	// will clean before the guest arrives). Prevents assigning a room that is
+	// occupied or out of service.
 	frm.set_query("room", function() {
 		if (frm.doc.room_type) {
 			return {
@@ -534,7 +560,7 @@ function setup_room_query(frm) {
 			};
 		}
 		return {
-			filters: { status: ["in", ["Available", "Vacant Clean", "Inspected"]] },
+			filters: { status: ["in", ["Available", "Vacant Dirty"]] },
 		};
 	});
 }

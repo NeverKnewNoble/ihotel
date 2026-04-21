@@ -81,30 +81,6 @@ frappe.pages["room_board"].on_page_load = function (wrapper) {
 							<span class="rb-dot" style="background:#f97316;"></span>
 							Occ. Dirty <span class="rb-pill-count">0</span>
 						</button>
-						<button class="rb-pill" data-status="Vacant Clean">
-							<span class="rb-dot" style="background:#34d399;"></span>
-							Vacant Clean <span class="rb-pill-count">0</span>
-						</button>
-						<button class="rb-pill" data-status="Occupied Clean">
-							<span class="rb-dot" style="background:#60a5fa;"></span>
-							Occ. Clean <span class="rb-pill-count">0</span>
-						</button>
-						<button class="rb-pill" data-status="Dirty">
-							<span class="rb-dot" style="background:#f97316;"></span>
-							Dirty <span class="rb-pill-count">0</span>
-						</button>
-						<button class="rb-pill" data-status="Pickup">
-							<span class="rb-dot" style="background:#a855f7;"></span>
-							Pickup <span class="rb-pill-count">0</span>
-						</button>
-						<button class="rb-pill" data-status="Inspected">
-							<span class="rb-dot" style="background:#06b6d4;"></span>
-							Inspected <span class="rb-pill-count">0</span>
-						</button>
-						<button class="rb-pill" data-status="Housekeeping">
-							<span class="rb-dot" style="background:#f59e0b;"></span>
-							Housekeeping <span class="rb-pill-count">0</span>
-						</button>
 						<button class="rb-pill" data-status="Out of Order">
 							<span class="rb-dot" style="background:#ef4444;"></span>
 							Out of Order <span class="rb-pill-count">0</span>
@@ -132,12 +108,6 @@ frappe.pages["room_board"].on_page_load = function (wrapper) {
 					<div class="rb-legend-item"><span class="rb-dot" style="background:#3b82f6;"></span><span><b>Occupied</b> — Guest currently in room</span></div>
 					<div class="rb-legend-item"><span class="rb-dot" style="background:#fb923c;"></span><span><b>Vacant Dirty</b> — Checked out, awaiting cleaning</span></div>
 					<div class="rb-legend-item"><span class="rb-dot" style="background:#f97316;"></span><span><b>Occupied Dirty</b> — Occupied, needs overnight cleaning</span></div>
-					<div class="rb-legend-item"><span class="rb-dot" style="background:#34d399;"></span><span><b>Vacant Clean</b> — Cleaned, pending inspection</span></div>
-					<div class="rb-legend-item"><span class="rb-dot" style="background:#60a5fa;"></span><span><b>Occupied Clean</b> — Occupied and cleaned</span></div>
-					<div class="rb-legend-item"><span class="rb-dot" style="background:#f97316;"></span><span><b>Dirty</b> — Needs cleaning</span></div>
-					<div class="rb-legend-item"><span class="rb-dot" style="background:#a855f7;"></span><span><b>Pickup</b> — Cleaning in progress</span></div>
-					<div class="rb-legend-item"><span class="rb-dot" style="background:#06b6d4;"></span><span><b>Inspected</b> — Cleaned &amp; inspector-approved</span></div>
-					<div class="rb-legend-item"><span class="rb-dot" style="background:#f59e0b;"></span><span><b>Housekeeping</b> — Scheduled maintenance clean</span></div>
 					<div class="rb-legend-item"><span class="rb-dot" style="background:#ef4444;"></span><span><b>Out of Order</b> — Cannot be sold (maintenance)</span></div>
 					<div class="rb-legend-item"><span class="rb-dot" style="background:#6b7280;"></span><span><b>Out of Service</b> — Temporarily removed from inventory</span></div>
 				</div>
@@ -156,7 +126,7 @@ frappe.pages["room_board"].on_page_show = function (wrapper) {
 };
 
 // Statuses where a room is ready to accept a walk-in
-const CHECK_IN_READY = new Set(["Available", "Inspected", "Pickup", "Vacant Clean", "Vacant Dirty"]);
+const CHECK_IN_READY = new Set(["Available", "Vacant Dirty"]);
 
 class RoomBoard {
 	constructor(page) {
@@ -300,12 +270,6 @@ class RoomBoard {
 			"Occupied":       "#3b82f6",
 			"Vacant Dirty":   "#fb923c",
 			"Occupied Dirty": "#f97316",
-			"Vacant Clean":   "#34d399",
-			"Occupied Clean": "#60a5fa",
-			"Dirty":          "#f97316",
-			"Pickup":         "#a855f7",
-			"Inspected":      "#06b6d4",
-			"Housekeeping":   "#f59e0b",
 			"Out of Order":   "#ef4444",
 			"Out of Service": "#6b7280",
 		};

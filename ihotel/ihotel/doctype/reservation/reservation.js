@@ -39,11 +39,11 @@ frappe.ui.form.on("Reservation", {
 			return { filters: { customer_type: "Company" } };
 		});
 
-		// Room filter: only show rooms that are ready to sell (Available,
-		// Vacant Clean, or Inspected). Prevents front desk from booking rooms
-		// that are occupied, dirty, being cleaned, or out of service.
+		// Room filter: only show rooms that are bookable (Available or Vacant
+		// Dirty — housekeeping will clean before arrival). Prevents booking
+		// occupied or out-of-service rooms.
 		frm.set_query("room", function () {
-			let filters = { status: ["in", ["Available", "Vacant Clean", "Inspected"]] };
+			let filters = { status: ["in", ["Available", "Vacant Dirty"]] };
 			if (frm.doc.room_type) filters["room_type"] = frm.doc.room_type;
 			return { filters };
 		});
@@ -226,6 +226,9 @@ frappe.ui.form.on("Reservation", {
 		(frm.doc.rate_lines || []).forEach(row => {
 			frappe.model.set_value("Stay Rate Line", row.name, "room_type", frm.doc.room_type || "");
 		});
+
+		// Auto-pick a Rate Type that's pinned to this Room Type for any blank rows.
+		auto_pick_rate_type_for_room_type(frm);
 	},
 
 	adults(frm) {
@@ -262,8 +265,13 @@ frappe.ui.form.on("Reservation", {
 });
 
 // ── Stay Rate Line row events ─────────────────────────────────────────────────
+// Stay Rate Line is shared with the Checked In doctype, which has its own
+// handlers in checked_in.js. These Reservation handlers must no-op when the
+// parent is Checked In (e.g. recalc_totals sets `total_rental`, a field that
+// only exists on Reservation) so they don't crash the other form's rate flow.
 frappe.ui.form.on("Stay Rate Line", {
 	rate_type(frm, cdt, cdn) {
+		if (frm.doctype !== "Reservation") return;
 		if (frm._syncing_rate_type) return;
 		const row = locals[cdt][cdn];
 		const new_rt = row.rate_type;
@@ -283,15 +291,36 @@ frappe.ui.form.on("Stay Rate Line", {
 			fetch_rate_line(frm, cdt, cdn);
 		}
 	},
-	room_type(frm, cdt, cdn)  { fetch_rate_line(frm, cdt, cdn); },
-	rate_column(frm, cdt, cdn){ fetch_rate_line(frm, cdt, cdn); },
-	discount1(frm, cdt, cdn)  { apply_line_discounts(frm, cdt, cdn); },
-	discount2(frm, cdt, cdn)  { apply_line_discounts(frm, cdt, cdn); },
-	discount3(frm, cdt, cdn)  { apply_line_discounts(frm, cdt, cdn); },
-	amount(frm)               { recalc_totals(frm); },
+	room_type(frm, cdt, cdn)  { if (frm.doctype !== "Reservation") return; fetch_rate_line(frm, cdt, cdn); },
+	rate_column(frm, cdt, cdn){ if (frm.doctype !== "Reservation") return; fetch_rate_line(frm, cdt, cdn); },
+	discount1(frm, cdt, cdn)  { if (frm.doctype !== "Reservation") return; apply_line_discounts(frm, cdt, cdn); },
+	discount2(frm, cdt, cdn)  { if (frm.doctype !== "Reservation") return; apply_line_discounts(frm, cdt, cdn); },
+	discount3(frm, cdt, cdn)  { if (frm.doctype !== "Reservation") return; apply_line_discounts(frm, cdt, cdn); },
+	amount(frm)               { if (frm.doctype !== "Reservation") return; recalc_totals(frm); },
 });
 
 // ── Rate line defaults ────────────────────────────────────────────────────────
+
+// Find the first Rate Type pinned to this room_type and set it on any rate_lines
+// rows that don't yet have a rate_type. Skips rows the user has already filled in.
+function auto_pick_rate_type_for_room_type(frm) {
+	if (!frm.doc.room_type) return;
+	const blank_rows = (frm.doc.rate_lines || []).filter(r => !r.rate_type);
+	if (!blank_rows.length) return;
+
+	frappe.db.get_list("Rate Type", {
+		filters: { applicable_to: "Room Type", room_type: frm.doc.room_type },
+		fields: ["name"],
+		limit: 1,
+		order_by: "modified desc",
+	}).then(rows => {
+		if (!rows || !rows.length) return;
+		const rate_type_name = rows[0].name;
+		blank_rows.forEach(row => {
+			frappe.model.set_value("Stay Rate Line", row.name, "rate_type", rate_type_name);
+		});
+	});
+}
 
 function set_rate_line_room_type_default(frm) {
 	const grid = frm.fields_dict.rate_lines && frm.fields_dict.rate_lines.grid;
@@ -516,11 +545,11 @@ function show_convert_to_checkin_dialog(frm) {
 				depends_on: "eval:doc.upgrade",
 				mandatory_depends_on: "eval:doc.upgrade",
 				description: __(
-					"Only ready-to-sell rooms are shown (Available, Vacant Clean, Inspected)."
+					"Only bookable rooms are shown (Available or Vacant Dirty)."
 				),
 				get_query() {
 					return {
-						filters: { status: ["in", ["Available", "Vacant Clean", "Inspected"]] },
+						filters: { status: ["in", ["Available", "Vacant Dirty"]] },
 					};
 				},
 			},

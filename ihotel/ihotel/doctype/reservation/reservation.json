@@ -173,7 +173,8 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Room Type",
-   "options": "Room Type"
+   "options": "Room Type",
+   "reqd": 1
   },
   {
    "fieldname": "room",
@@ -740,7 +741,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-19 21:41:53.356767",
+ "modified": "2026-04-20 09:50:52.157262",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Reservation",
