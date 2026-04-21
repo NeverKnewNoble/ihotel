@@ -598,17 +598,26 @@ class CheckedIn(Document):
 
     def _compute_tax(self, net_total):
         """Compute tax from the first rate_line's Rate Type tax_schedule."""
+        return round(sum(amt for _acct, amt in self._compute_tax_breakdown(net_total)), 2)
+
+    def _compute_tax_breakdown(self, net_total):
+        """Return per-row tax as [(tax_account, amount), ...] from the Rate Type tax_schedule.
+
+        tax_account may be None for rows where the Rate Type schedule did not set one;
+        callers that need per-account posting should handle that case.
+        """
         from frappe.utils import flt, cint
         rate_type_name = next(
             (r.rate_type for r in (self.rate_lines or []) if r.rate_type), None
         )
         if not rate_type_name:
-            return 0.0
+            return []
         try:
             rt = frappe.get_cached_doc("Rate Type", rate_type_name)
         except Exception:
-            return 0.0
+            return []
         amounts = []
+        breakdown = []
         for row in (rt.tax_schedule or []):
             ct   = row.charge_type or "On Net Total"
             rate = flt(row.rate)
@@ -623,8 +632,10 @@ class CheckedIn(Document):
             elif ct == "On Previous Row Total":
                 idx = cint(row.row_id or 1) - 1
                 amt = (net_total + sum(amounts[:idx + 1])) * rate / 100
-            amounts.append(round(amt, 2))
-        return round(sum(amounts), 2)
+            amt = round(amt, 2)
+            amounts.append(amt)
+            breakdown.append((row.tax_account, amt))
+        return breakdown
 
     def calculate_additional_services_amount(self):
         """
