@@ -18,8 +18,8 @@ def get_dashboard_data():
         as_dict=True,
     )
     room_status = {
-        "Available": 0, "Occupied": 0, "Dirty": 0,
-        "Pickup": 0, "Inspected": 0, "Housekeeping": 0,
+        "Available": 0, "Occupied": 0,
+        "Vacant Dirty": 0, "Occupied Dirty": 0,
         "Out of Order": 0, "Out of Service": 0,
     }
     for r in room_counts:

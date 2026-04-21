@@ -288,7 +288,13 @@ class Reservation(Document):
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def search_reservations_for_check_in(doctype, txt, searchfield, start, page_len, filters):
-	"""Search eligible reservations by reservation code or guest name."""
+	"""Search eligible reservations by reservation code or guest name.
+
+	Returns any non-cancelled, not-yet-converted reservation. The caller is
+	responsible for supplying a room (either the one pinned on the reservation
+	or an `override_room` passed to convert_to_hotel_stay — e.g. from the Room
+	Board's check-in dialog).
+	"""
 	search_txt = f"%{txt or ''}%"
 	return frappe.db.sql(
 		"""
@@ -299,7 +305,6 @@ def search_reservations_for_check_in(doctype, txt, searchfield, start, page_len,
 		LEFT JOIN `tabGuest` g ON g.name = r.guest
 		WHERE r.status != 'cancelled'
 		  AND IFNULL(r.hotel_stay, '') = ''
-		  AND IFNULL(r.room, '') != ''
 		  AND (
 				r.name LIKE %(search_txt)s
 				OR IFNULL(r.full_name, '') LIKE %(search_txt)s

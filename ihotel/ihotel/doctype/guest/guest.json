@@ -422,6 +422,7 @@
   }
  ],
  "row_format": "Dynamic",
+ "search_fields": "phone,email,id_number",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

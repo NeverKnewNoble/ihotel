@@ -4,13 +4,9 @@ from frappe.utils import today
 
 ALLOWED_ROOM_STATUSES = [
 	"Available",
+	"Occupied",
 	"Vacant Dirty",
 	"Occupied Dirty",
-	"Vacant Clean",
-	"Occupied Clean",
-	"Pickup",
-	"Inspected",
-	"Housekeeping",
 	"Out of Order",
 	"Out of Service",
 ]
