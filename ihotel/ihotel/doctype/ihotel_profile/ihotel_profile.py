@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt, nowdate
 
@@ -10,16 +11,57 @@ from ihotel.ihotel.doctype.charge_type.charge_type import ensure_default_charge_
 
 class iHotelProfile(Document):
 	def validate(self):
+		self.validate_linked_payment_rows_preserved()
 		self.recalculate_amounts()
 		self.update_status()
 
+	def validate_linked_payment_rows_preserved(self):
+		"""Block removal of folio payment rows that already post to ERPXpand.
+
+		Once a Payment Items row carries a `payment_entry` link, its GL impact
+		is live — you can't just drop the row from the folio without reversing
+		the PE first. On save, compare the current rows against DB state and
+		reject any deletion of a PE-linked row.
+
+		Bypass path: the automated `Payment Entry` on_cancel handler removes
+		folio rows via direct SQL, so this validator never fires for that
+		legitimate cleanup.
+		"""
+		if self.is_new():
+			return
+		db_links = frappe.db.sql(
+			"""
+			SELECT name, payment_entry
+			FROM `tabPayment Items`
+			WHERE parent = %s AND parenttype = 'iHotel Profile'
+			  AND IFNULL(payment_entry, '') != ''
+			""",
+			self.name,
+			as_dict=True,
+		)
+		if not db_links:
+			return
+		current_names = {row.name for row in (self.payments or [])}
+		for db_row in db_links:
+			if db_row.name not in current_names:
+				frappe.throw(
+					_("Cannot remove a folio payment row that is linked to Payment Entry {0}. Cancel the Payment Entry first; the folio row will be cleared automatically.")
+					.format(db_row.payment_entry),
+					title=_("Linked Payment Entry"),
+				)
+
 	def recalculate_amounts(self):
-		"""Sum charges and payments separately; derive outstanding balance."""
+		"""Sum charges and payments separately; derive outstanding balance.
+
+		Payments may be received in any currency; they convert to company
+		currency via each row's exchange_rate (default 1 when not set).
+		"""
 		self.total_amount = round(
 			sum(flt(r.amount) for r in self.get("charges", [])), 2
 		)
 		self.total_payments = round(
-			sum(flt(r.rate) for r in self.get("payments", [])), 2
+			sum(flt(r.rate) * (flt(r.exchange_rate) or 1) for r in self.get("payments", [])),
+			2,
 		)
 		self.outstanding_balance = round(
 			self.total_amount - self.total_payments, 2
@@ -37,6 +79,31 @@ class iHotelProfile(Document):
 			self.status = "Settled"
 		elif self.status == "Settled" and self.outstanding_balance > 0:
 			self.status = "Open"
+
+	def on_update(self):
+		"""Cascade folio-payment sync to ERPXpand GL on every save.
+
+		Delegates to the linked Checked In's _sync_folio_payments_from_profile
+		helper, which iterates `payments` and posts a Payment Entry for each
+		row missing `payment_entry`. Partial payments post immediately — the
+		folio doesn't have to be Settled first. Idempotency (via the
+		`payment_entry` link) prevents duplicates on subsequent saves.
+
+		Failures are logged, never raised — a downstream GL hiccup must not
+		block front desk from editing the folio.
+		"""
+		if not self.hotel_stay:
+			return
+		try:
+			if frappe.db.get_single_value("iHotel Settings", "enable_accounting_integration") != 1:
+				return
+			stay = frappe.get_doc("Checked In", self.hotel_stay)
+			stay._sync_folio_payments_from_profile(self)
+		except Exception as e:
+			frappe.log_error(
+				f"iHotel: folio on_update payment sync failed for profile "
+				f"{self.name}: {e!s}"
+			)
 
 	def on_trash(self):
 		"""Break the back-reference in Checked In before Frappe's link-check runs."""

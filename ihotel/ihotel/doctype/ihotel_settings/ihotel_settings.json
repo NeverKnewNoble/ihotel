@@ -467,7 +467,7 @@
   },
   {
    "default": "Auto",
-   "description": "Desk only: drives sidebar (Hotel Account / Trial Balance) and whether this Accounting tab is shown, without installing apps. After changing, reload the browser (hard refresh). Real posting still uses whether ERPNext is actually installed.",
+   "description": "UI-only toggle: controls whether the iHotel Hotel Account sidebar link is shown (hidden when ERPXpand is effectively installed). Does NOT gate GL posting — all JE / SI / PE posting uses whether ERPNext is actually installed. Reload the browser after changing.",
    "fieldname": "erpnext_presence_test_mode",
    "fieldtype": "Select",
    "label": "ERPXpand presence",
@@ -483,7 +483,7 @@
   {
    "default": "0",
    "depends_on": "eval:doc.enable_accounting_integration",
-   "description": "When enabled, each submitted Night Audit posts room revenue to ERPXpand as a Journal Entry (Dr receivable, Cr room revenue). Checkout Sales Invoices then skip Room Charge lines so revenue is not booked twice. Requires ERPXpand and night audits completed for all stay nights before checkout.",
+   "description": "When enabled, each submitted Night Audit posts room revenue as a Journal Entry (Dr receivable gross per stay, Cr room revenue net, and one Cr per tax account from the stay's Rate Type Tax Schedule). Checkout Sales Invoices then skip Room Charge lines so revenue is not booked twice. Requires ERPXpand and night audits completed for all stay nights before checkout.",
    "fieldname": "post_room_revenue_via_night_audit_je",
    "fieldtype": "Check",
    "label": "Post room revenue from Night Audit (Journal Entry)"

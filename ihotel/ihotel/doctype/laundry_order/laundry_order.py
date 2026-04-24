@@ -99,6 +99,12 @@ class LaundryOrder(Document):
 			"rate": flt(self.total_amount),
 			"income_account": settings.default_income_account,
 		})
+		# Apply the default Sales Taxes and Charges Template so tax breaks out
+		# per GL account (VAT, Service Charge, etc.) on the invoice.
+		# When empty, the invoice is built tax-free (backward-compatible).
+		if settings.get("default_taxes_and_charges"):
+			si.taxes_and_charges = settings.default_taxes_and_charges
+			si.set_taxes()
 		si.insert(ignore_permissions=True)
 		si.submit()
 		self.db_set("sales_invoice", si.name)

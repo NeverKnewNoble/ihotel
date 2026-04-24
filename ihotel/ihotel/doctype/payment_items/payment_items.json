@@ -8,9 +8,12 @@
  "field_order": [
   "date",
   "payment_method",
-  "detail",
+  "currency",
+  "exchange_rate",
   "rate",
+  "detail",
   "payment_status",
+  "payment_entry",
   "print_payment"
  ],
  "fields": [
@@ -24,10 +27,10 @@
   },
   {
    "fieldname": "payment_method",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Payment Method",
-   "options": "Cash\nVisa\nMastercard\nAmex\nBank Transfer\nCheque\nCity Ledger\nComplimentary",
+   "options": "Mode of Payment",
    "reqd": 1
   },
   {
@@ -37,11 +40,30 @@
    "label": "Description"
   },
   {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Currency",
+   "options": "Currency",
+   "description": "Currency this payment was received in. Defaults to the company currency."
+  },
+  {
+   "default": "1",
+   "fieldname": "exchange_rate",
+   "fieldtype": "Float",
+   "in_list_view": 0,
+   "label": "Exchange Rate",
+   "precision": "6",
+   "description": "Rate from the selected currency to the company currency at payment time. Used to convert Amount for GL posting."
+  },
+  {
    "fieldname": "rate",
    "fieldtype": "Currency",
    "in_list_view": 1,
    "label": "Amount",
-   "reqd": 1
+   "reqd": 1,
+   "options": "currency",
+   "description": "Amount received, in the selected Currency."
   },
   {
    "default": "Pending payment",
@@ -50,6 +72,14 @@
    "in_list_view": 1,
    "label": "Status",
    "options": "Pending payment\nPaid"
+  },
+  {
+   "fieldname": "payment_entry",
+   "fieldtype": "Link",
+   "label": "Payment Entry",
+   "options": "Payment Entry",
+   "read_only": 1,
+   "description": "ERPXpand Payment Entry posted for this folio payment. Set automatically when the folio syncs to GL."
   },
   {
    "fieldname": "print_payment",

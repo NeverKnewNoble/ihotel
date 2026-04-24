@@ -64,17 +64,23 @@ class TrialBalance {
     <div class="tb-filters-section">
         <div class="row">
             <div class="col-md-3">
+                <label>` + __("Company") + ` <span class="tb-text-danger">*</span></label>
+                <select class="form-control tb-company">
+                    <option value="">` + __("Select Company") + `</option>
+                </select>
+            </div>
+            <div class="col-md-2">
                 <label>` + __("From Date") + `</label>
                 <input type="date" class="form-control tb-from-date">
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label>` + __("To Date") + `</label>
                 <input type="date" class="form-control tb-to-date">
             </div>
-            <div class="col-md-3">
-                <label>` + __("Account Type") + `</label>
+            <div class="col-md-2">
+                <label>` + __("Root Type") + `</label>
                 <select class="form-control tb-account-type">
-                    <option value="">` + __("All Account Types") + `</option>
+                    <option value="">` + __("All Root Types") + `</option>
                 </select>
             </div>
             <div class="col-md-3">
@@ -127,9 +133,9 @@ class TrialBalance {
             <table class="table table-bordered trial-balance-table">
                 <thead>
                     <tr>
-                        <th>` + __("Account Code") + `</th>
+                        <th>` + __("Account Number") + `</th>
                         <th>` + __("Account Name") + `</th>
-                        <th>` + __("Account Type") + `</th>
+                        <th>` + __("Root Type") + `</th>
                         <th class="text-right">` + __("Debit") + `</th>
                         <th class="text-right">` + __("Credit") + `</th>
                     </tr>
@@ -172,6 +178,10 @@ class TrialBalance {
 			else if (action === "export") me.export_trial_balance();
 			else if (action === "refresh") me.load_trial_balance();
 		});
+		this.$root.on("change", ".tb-company", function () {
+			me.reload_account_type_options();
+			me.load_trial_balance();
+		});
 		this.$root.on("keypress", ".tb-from-date, .tb-to-date", function (e) {
 			if (e.which === 13) me.load_trial_balance();
 		});
@@ -179,22 +189,46 @@ class TrialBalance {
 
 	load_initial_data() {
 		const me = this;
+		frappe.db.get_list("Company", { fields: ["name"], limit: 0 }).then(function (rows) {
+			const select = me.$root.find(".tb-company");
+			(rows || []).forEach(function (row) {
+				select.append($("<option>").val(row.name).text(row.name));
+			});
+			// Default to the user's default company when available.
+			const defaults = frappe.defaults.get_user_defaults() || {};
+			const default_company = defaults.company || (rows && rows.length === 1 ? rows[0].name : "");
+			if (default_company) {
+				select.val(default_company);
+				me.reload_account_type_options();
+				me.load_trial_balance();
+			} else {
+				me.show_error(__("Select a Company to view the trial balance."));
+			}
+		});
+	}
+
+	reload_account_type_options() {
+		const me = this;
+		const company = this.$root.find(".tb-company").val();
+		const select = this.$root.find(".tb-account-type");
+		select.empty().append($("<option>").val("").text(__("All Root Types")));
+		if (!company) return;
 		frappe.call({
 			method: "ihotel.ihotel.page.trial_balance.trial_balance.get_account_filter_options",
+			args: { company: company },
 			callback: function (r) {
 				if (r.message && r.message.account_types) {
-					const select = me.$root.find(".tb-account-type");
 					r.message.account_types.forEach(function (type) {
 						select.append($("<option>").val(type).text(type));
 					});
 				}
 			},
 		});
-		this.load_trial_balance();
 	}
 
 	get_filters() {
 		return {
+			company: this.$root.find(".tb-company").val(),
 			from_date: this.$root.find(".tb-from-date").val(),
 			to_date: this.$root.find(".tb-to-date").val(),
 			account_type: this.$root.find(".tb-account-type").val(),
@@ -203,12 +237,15 @@ class TrialBalance {
 
 	load_trial_balance() {
 		const me = this;
+		const filters = this.get_filters();
+		if (!filters.company) {
+			this.show_error(__("Select a Company to view the trial balance."));
+			return;
+		}
 		this.show_loading();
 		frappe.call({
 			method: "ihotel.ihotel.page.trial_balance.trial_balance.get_trial_balance_data",
-			args: {
-				filters: JSON.stringify(this.get_filters()),
-			},
+			args: { filters: JSON.stringify(filters) },
 			callback: function (r) {
 				if (r.message) {
 					me.current_data = r.message;
@@ -250,9 +287,9 @@ class TrialBalance {
 		data.trial_balance.forEach(function (row) {
 			const tr = $("<tr>");
 			if (row.is_group) tr.addClass("group-account");
-			tr.append("<td>" + (row.account_code || "") + "</td>");
-			tr.append("<td>" + row.account_name + "</td>");
-			tr.append("<td>" + row.account_type + "</td>");
+			tr.append("<td>" + (row.account_number || "") + "</td>");
+			tr.append("<td>" + frappe.utils.escape_html(row.account_name) + "</td>");
+			tr.append("<td>" + (row.root_type || "") + "</td>");
 			tr.append('<td class="text-right">' + me.format_currency(row.debit) + "</td>");
 			tr.append('<td class="text-right">' + me.format_currency(row.credit) + "</td>");
 			tbody.append(tr);
@@ -290,6 +327,7 @@ class TrialBalance {
 		this.$root.find(".tb-from-date").val(first_day.toISOString().split("T")[0]);
 		this.$root.find(".tb-to-date").val(today.toISOString().split("T")[0]);
 		this.$root.find(".tb-account-type").val("");
+		// Company is deliberately NOT cleared — trial balance is always company-scoped.
 		this.load_trial_balance();
 	}
 
@@ -328,9 +366,9 @@ class TrialBalance {
                     <table class="print-table">
                         <thead>
                             <tr>
-                                <th>${__("Account Code")}</th>
+                                <th>${__("Account Number")}</th>
                                 <th>${__("Account Name")}</th>
-                                <th>${__("Account Type")}</th>
+                                <th>${__("Root Type")}</th>
                                 <th class="text-right">${__("Debit")}</th>
                                 <th class="text-right">${__("Credit")}</th>
                             </tr>
@@ -341,9 +379,9 @@ class TrialBalance {
 		this.current_data.trial_balance.forEach(function (row) {
 			print_content += `
                 <tr${row.is_group ? ' class="group-account"' : ""}>
-                    <td>${row.account_code || ""}</td>
-                    <td>${row.account_name}</td>
-                    <td>${row.account_type}</td>
+                    <td>${row.account_number || ""}</td>
+                    <td>${frappe.utils.escape_html(row.account_name)}</td>
+                    <td>${row.root_type || ""}</td>
                     <td class="text-right">${me.format_currency(row.debit)}</td>
                     <td class="text-right">${me.format_currency(row.credit)}</td>
                 </tr>`;

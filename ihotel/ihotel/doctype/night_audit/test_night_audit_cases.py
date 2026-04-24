@@ -1,6 +1,8 @@
 # Copyright (c) 2025, Noble and Contributors
 # See license.txt
 
+import unittest
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import add_days, add_to_date, flt, today
@@ -338,4 +340,238 @@ class TestNightAudit(FrappeTestCase):
 		na.calculate_audit_metrics()
 		self.assertGreaterEqual(na.occupied_rooms, 2)
 		self.assertGreaterEqual(na.total_revenue, 220.0)
+
+
+# ── ERPXpand Journal Entry tax posting tests ─────────────────────────────────
+
+def _accounting_ready():
+	"""True if this site has enough config for JE integration tests to run.
+
+	Requires the Room Charge income account + AR account + tax accounts to all
+	be under the configured Company (the SI / JE path validates that).
+	"""
+	if "erpnext" not in frappe.get_installed_apps():
+		return False
+	settings = frappe.get_single("iHotel Settings")
+	company = settings.get("company")
+	ar = settings.get("accounts_receivable_account")
+	if not company or not ar:
+		return False
+
+	# AR account must belong to the configured company.
+	ar_company = frappe.db.get_value("Account", ar, "company")
+	if ar_company != company:
+		return False
+
+	# Room Charge income account row must exist AND belong to the company.
+	for r in (settings.get("income_accounts") or []):
+		if r.charge_type == "Room Charge" and r.account:
+			acct_company = frappe.db.get_value("Account", r.account, "company")
+			if acct_company == company:
+				return True
+	return False
+
+
+def _find_test_tax_accounts(company, n=2):
+	"""Return up to n Tax-type leaf accounts scoped to company.
+
+	Strictly scoped to the passed company so the JE validation doesn't
+	reject the posting with a cross-company account error. Falls back to
+	Liability-type leaves when no Tax-typed accounts exist under this
+	company, so tests can still run on a minimally-seeded chart.
+	"""
+	taxes = frappe.db.get_all(
+		"Account",
+		filters={"company": company, "account_type": "Tax", "is_group": 0},
+		pluck="name",
+		limit=n,
+	)
+	if len(taxes) >= n:
+		return list(taxes)
+	more = frappe.db.get_all(
+		"Account",
+		filters={"company": company, "root_type": "Liability", "is_group": 0},
+		pluck="name",
+		limit=(n - len(taxes)),
+	)
+	return list(taxes) + list(more)
+
+
+@unittest.skipUnless(_accounting_ready(), "iHotel Settings accounting not configured on this site")
+class TestNightAuditJournalEntryTax(FrappeTestCase):
+	"""Validates the Night Audit JE posts tax per tax_account and cancels cleanly."""
+
+	def setUp(self):
+		import unittest as _unittest  # keep symbol in scope for class-level decorator
+		self.suffix = frappe.generate_hash(length=8)
+		base_offset = -(200 + (int(self.suffix, 16) % 400))
+		self.audit_date = add_days(today(), base_offset)
+
+		self.settings = frappe.get_single("iHotel Settings")
+		self.company = self.settings.company
+
+		# Snapshot & toggle the JE-mode flags we need.
+		self._prev_allow = frappe.db.get_single_value("iHotel Settings", "allow_past_dates")
+		self._prev_enable = self.settings.get("enable_accounting_integration")
+		self._prev_je_mode = self.settings.get("post_room_revenue_via_night_audit_je")
+		frappe.db.set_single_value("iHotel Settings", "allow_past_dates", 1)
+		frappe.db.set_single_value("iHotel Settings", "enable_accounting_integration", 1)
+		frappe.db.set_single_value("iHotel Settings", "post_room_revenue_via_night_audit_je", 1)
+		frappe.db.commit()
+
+		# Two tax accounts for the schedule (fall back gracefully in minimal envs).
+		self.tax_accts = _find_test_tax_accounts(self.company, n=2)
+		self._has_two_tax_accts = len(self.tax_accts) >= 2
+
+		# Rate Type with a 2-row tax_schedule.
+		schedule = []
+		if self._has_two_tax_accts:
+			schedule = [
+				{"tax_name": "VAT", "charge_type": "On Net Total", "rate": 10.0,
+				 "tax_account": self.tax_accts[0]},
+				{"tax_name": "Service", "charge_type": "On Net Total", "rate": 5.0,
+				 "tax_account": self.tax_accts[1]},
+			]
+		self.rt_tax = frappe.get_doc({
+			"doctype": "Rate Type",
+			"rate_type_name": f"RT-JE-{self.suffix}",
+		})
+		for row in schedule:
+			self.rt_tax.append("tax_schedule", row)
+		self.rt_tax.insert(ignore_permissions=True)
+
+		# Stay fixtures — attach rate_line BEFORE submit (Checked In blocks
+		# rate_lines updates after submit via validate_update_after_submit).
+		self.rt = _nb_make_room_type(self.suffix)
+		self.room = _nb_make_room(self.suffix, self.rt.name)
+		# Guest needs a valid phone so Customer auto-creation during JE post
+		# doesn't fall over on sites where Customer.mobile_number is required.
+		self.guest = frappe.get_doc({
+			"doctype": "Guest",
+			"guest_name": f"NB Guest {self.suffix}",
+			"phone": "0551234567",
+		}).insert(ignore_permissions=True)
+
+		stay = frappe.get_doc({
+			"doctype": "Checked In",
+			"guest": self.guest.name,
+			"room_type": self.rt.name,
+			"room": self.room.name,
+			"expected_check_in": self.audit_date,
+			"expected_check_out": add_days(self.audit_date, 2),
+			"status": "Reserved",
+		})
+		stay.append("rate_lines", {
+			"rate_type": self.rt_tax.name,
+			"amount": 1000,
+		})
+		stay.insert(ignore_permissions=True)
+		stay.submit()
+		frappe.db.set_value("Checked In", stay.name, {
+			"status": "Checked In",
+			"actual_check_in": self.audit_date,
+			"room_rate": 1000,
+		}, update_modified=False)
+		stay.reload()
+		self.stay = stay
+		self._audits = []
+
+	def tearDown(self):
+		for na in self._audits:
+			try:
+				na.reload()
+				if na.docstatus == 1:
+					na.cancel()
+				frappe.delete_doc("Night Audit", na.name, ignore_permissions=True, force=True)
+			except Exception:
+				pass
+		try:
+			self.stay.reload()
+			if self.stay.docstatus == 1:
+				self.stay.cancel()
+			frappe.delete_doc("Checked In", self.stay.name, ignore_permissions=True, force=True)
+		except Exception:
+			pass
+		for name, dt in [
+			(self.guest.name, "Guest"),
+			(self.room.name, "Room"),
+			(self.rt.name, "Room Type"),
+			(self.rt_tax.name, "Rate Type"),
+		]:
+			try:
+				frappe.delete_doc(dt, name, ignore_permissions=True, force=True)
+			except Exception:
+				pass
+		frappe.db.set_single_value("iHotel Settings", "allow_past_dates", self._prev_allow or 0)
+		frappe.db.set_single_value("iHotel Settings", "enable_accounting_integration",
+		                            self._prev_enable or 0)
+		frappe.db.set_single_value("iHotel Settings", "post_room_revenue_via_night_audit_je",
+		                            self._prev_je_mode or 0)
+		frappe.db.commit()
+
+	def test_je_posts_per_tax_account(self):
+		"""JE has: 1 Dr AR gross, 1 Cr revenue net, N Cr lines (one per tax_account)."""
+		if not self._has_two_tax_accts:
+			self.skipTest("Site has <2 Tax accounts; cannot exercise per-account split.")
+
+		na = _nb_submit_audit(self.audit_date)
+		self._audits.append(na)
+		na.reload()
+
+		je_name = na.erpnext_journal_entry
+		self.assertTrue(je_name, "Night audit must set erpnext_journal_entry after submit.")
+
+		je = frappe.get_doc("Journal Entry", je_name)
+		ar_acct = self.settings.accounts_receivable_account
+
+		dr_rows = [a for a in je.accounts if flt(a.debit_in_account_currency) > 0]
+		cr_rows = [a for a in je.accounts if flt(a.credit_in_account_currency) > 0]
+
+		# AR debit line: gross = net (1000) + tax (10% + 5% = 150) = 1150
+		self.assertEqual(len(dr_rows), 1)
+		self.assertEqual(dr_rows[0].account, ar_acct)
+		self.assertAlmostEqual(flt(dr_rows[0].debit_in_account_currency), 1150.0, places=2)
+
+		# Credit lines: one revenue (1000) + one per tax account (100 + 50).
+		cr_by_acct = {a.account: flt(a.credit_in_account_currency) for a in cr_rows}
+		self.assertEqual(len(cr_by_acct), 3,
+			"Expected 3 distinct credit accounts: revenue + 2 taxes.")
+		self.assertAlmostEqual(cr_by_acct.get(self.tax_accts[0], 0), 100.0, places=2)
+		self.assertAlmostEqual(cr_by_acct.get(self.tax_accts[1], 0), 50.0, places=2)
+
+		# Balance check.
+		total_debit = sum(flt(a.debit_in_account_currency) for a in je.accounts)
+		total_credit = sum(flt(a.credit_in_account_currency) for a in je.accounts)
+		self.assertAlmostEqual(total_debit, total_credit, places=2)
+
+	def test_cancel_audit_cascades_je_cancel(self):
+		"""Cancelling the Night Audit must cancel the linked Journal Entry."""
+		na = _nb_submit_audit(self.audit_date)
+		self._audits.append(na)
+		na.reload()
+		je_name = na.erpnext_journal_entry
+		if not je_name:
+			self.skipTest("JE was not created (e.g. no rate_lines); cancel cascade not applicable.")
+
+		na.cancel()
+		docstatus = frappe.db.get_value("Journal Entry", je_name, "docstatus")
+		self.assertEqual(docstatus, 2, "Linked Journal Entry must be cancelled.")
+
+	def test_je_bails_when_tax_row_missing_account(self):
+		"""A tax_schedule row without an ERPXpand tax_account must prevent JE creation."""
+		# Break the second schedule row's tax_account.
+		rt_doc = frappe.get_doc("Rate Type", self.rt_tax.name)
+		if not rt_doc.tax_schedule or len(rt_doc.tax_schedule) < 2:
+			self.skipTest("Fixture lacks a 2-row schedule.")
+		rt_doc.tax_schedule[1].tax_account = None
+		rt_doc.save(ignore_permissions=True)
+		frappe.clear_cache(doctype="Rate Type")
+
+		na = _nb_submit_audit(self.audit_date)
+		self._audits.append(na)
+		na.reload()
+		self.assertFalse(
+			na.erpnext_journal_entry,
+			"JE must not be created when a tax_schedule row is missing tax_account.",
+		)
 

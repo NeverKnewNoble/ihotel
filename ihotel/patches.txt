@@ -6,3 +6,4 @@
 # Patches added in this section will be executed after doctypes are migrated
 ihotel.patches.v1_0.rename_laundry_reservation_id_to_checked_in
 ihotel.patches.v1_0.migrate_income_accounts_to_table
+ihotel.patches.v1_0.drop_ihotel_settings_tax_account

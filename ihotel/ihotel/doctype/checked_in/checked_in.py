@@ -18,6 +18,18 @@ def _resolve_default_customer_group(settings):
     return group
 
 
+# Payment Items.payment_method is a Link to Mode of Payment, so the stored
+# value IS the ERPXpand Mode of Payment name — no translation table needed.
+_DEFAULT_MODE_OF_PAYMENT = "Cash"
+
+
+def _company_currency(company):
+    """Return the company's base currency; memoised via Frappe's cache."""
+    if not company:
+        return "USD"
+    return frappe.get_cached_value("Company", company, "default_currency") or "USD"
+
+
 @frappe.whitelist()
 def create_folio(checked_in_name):
 	"""Manually create a folio for a submitted Checked In document."""
@@ -597,18 +609,27 @@ class CheckedIn(Document):
         self.room_rate = rate_lines_total
 
     def _compute_tax(self, net_total):
-        """Compute tax from the first rate_line's Rate Type tax_schedule."""
+        """Compute total tax from the first rate_line's Rate Type tax_schedule (scalar)."""
+        return round(sum(amt for _acct, amt in self._compute_tax_breakdown(net_total)), 2)
+
+    def _compute_tax_breakdown(self, net_total):
+        """Return per-row tax as [(tax_account, amount), ...] from the Rate Type tax_schedule.
+
+        tax_account may be None when the Rate Type schedule did not set one;
+        callers that need per-account posting should handle that case.
+        """
         from frappe.utils import flt, cint
         rate_type_name = next(
             (r.rate_type for r in (self.rate_lines or []) if r.rate_type), None
         )
         if not rate_type_name:
-            return 0.0
+            return []
         try:
             rt = frappe.get_cached_doc("Rate Type", rate_type_name)
         except Exception:
-            return 0.0
+            return []
         amounts = []
+        breakdown = []
         for row in (rt.tax_schedule or []):
             ct   = row.charge_type or "On Net Total"
             rate = flt(row.rate)
@@ -623,8 +644,10 @@ class CheckedIn(Document):
             elif ct == "On Previous Row Total":
                 idx = cint(row.row_id or 1) - 1
                 amt = (net_total + sum(amounts[:idx + 1])) * rate / 100
-            amounts.append(round(amt, 2))
-        return round(sum(amounts), 2)
+            amt = round(amt, 2)
+            amounts.append(amt)
+            breakdown.append((row.tax_account, amt))
+        return breakdown
 
     def calculate_additional_services_amount(self):
         """
@@ -940,13 +963,18 @@ class CheckedIn(Document):
 
             invoice = self._build_sales_invoice(profile, customer, company, settings)
             if not invoice:
+                # No Sales Invoice (e.g. room-only folio in Night Audit JE mode
+                # where Room Charges are skipped). Still post any folio payments
+                # as standalone Receives against the Customer AR — the JE path
+                # already booked AR via the Night Audit JE.
                 if profile.get("payments"):
+                    self._sync_folio_payments(profile, customer, company, invoice=None)
                     frappe.log_error(
-                        title="iHotel checkout: payments without Sales Invoice",
+                        title="iHotel checkout: payments posted without Sales Invoice",
                         message=(
                             f"Stay {self.name}: folio has payments but no Sales Invoice was built "
                             "(e.g. room-only folio with Night Audit Journal Entry mode). "
-                            "Record receipts in ERPXpand manually if needed."
+                            "Posted Payment Entries as standalone Receives against Debtors."
                         ),
                     )
                 return
@@ -956,7 +984,7 @@ class CheckedIn(Document):
             self.db_set("invoice_sync_error", "", update_modified=False)
 
             if profile.get("payments"):
-                self._create_payment_entries(profile, invoice, customer, company)
+                self._sync_folio_payments(profile, customer, company, invoice=invoice)
 
             frappe.msgprint(
                 _("Sales Invoice {0} created in ERPXpand.").format(
@@ -1019,7 +1047,17 @@ class CheckedIn(Document):
             return None
 
     def _build_sales_invoice(self, profile, customer, company, settings):
-        """Build, insert and submit a Sales Invoice from the folio charges."""
+        """Build, insert and submit a Sales Invoice from the stay + folio.
+
+        Items are posted **tax-exclusive** (net) and a Sales Taxes and Charges
+        table is appended so tax breaks out per GL account (from the stay's
+        Rate Type tax_schedule). Non-room folio charges (services, laundry,
+        F&B) are sourced from the folio because they are posted net.
+
+        Invariant relied on: `_create_folio` and `Laundry Order._post_to_folio`
+        post non-Room folio rows at **net** rate; Room Charge rows are posted
+        tax-inclusive and are not read here (we use rate_lines × nights).
+        """
         from frappe.utils import flt, nowdate
         from ihotel.ihotel.doctype.ihotel_settings.ihotel_settings import resolve_income_account
 
@@ -1041,74 +1079,446 @@ class CheckedIn(Document):
             and settings.get("post_room_revenue_via_night_audit_je")
         )
 
-        # Per-charge-type income account resolution. Room Charge and any other
-        # charge type (F&B, Laundry, Spa, Minibar, …) pick their credit account
-        # from the Income Accounts table on iHotel Settings — keyed by charge_type.
-        for charge in profile.charges:
-            if skip_room_on_invoice and charge.charge_type == "Room Charge":
+        nights = self.nights or 1
+        room_net_total = 0.0
+        service_net_total = 0.0
+
+        # Room revenue: one SI item per rate_line, net × nights.
+        # Skipped when the Night Audit JE mode is on — that path books room
+        # revenue and tax directly to GL per schedule account.
+        if not skip_room_on_invoice and room_item:
+            for rl in (self.rate_lines or []):
+                rate = flt(rl.amount)
+                if rate <= 0:
+                    continue
+                row = {
+                    "item_code": room_item,
+                    "item_name": _("Room Charge — {0}").format(self.room or ""),
+                    "description": getattr(rl, "rate_type", None) or "Room Charge",
+                    "qty": nights,
+                    "rate": rate,
+                }
+                acct = resolve_income_account("Room Charge", company)
+                if acct:
+                    row["income_account"] = acct
+                invoice.append("items", row)
+                room_net_total += rate * nights
+
+        # Non-room charges from the folio (services, laundry, F&B, …).
+        # Posted net per the folio invariant; billed at stored rate × qty.
+        for charge in (profile.charges or []):
+            if charge.charge_type == "Room Charge":
                 continue
-            is_room = (charge.charge_type == "Room Charge")
-            item_code = room_item if is_room else extra_item
-            if not item_code:
+            rate = flt(charge.rate)
+            qty = flt(charge.quantity) or 1
+            if rate <= 0 and qty <= 0:
+                continue
+            if not extra_item:
                 continue
             row = {
-                "item_code": item_code,
+                "item_code": extra_item,
                 "item_name": charge.description or charge.charge_type,
                 "description": charge.description or charge.charge_type,
-                "qty": flt(charge.quantity) or 1,
-                "rate": flt(charge.rate),
+                "qty": qty,
+                "rate": rate,
             }
             acct = resolve_income_account(charge.charge_type, company)
             if acct:
                 row["income_account"] = acct
             invoice.append("items", row)
+            service_net_total += rate * qty
 
         if not invoice.get("items"):
             frappe.log_error(f"iHotel: No items to invoice for stay {self.name} — check Item settings")
             return None
 
+        # Tax: one Sales Taxes and Charges row per tax_account from the stay's
+        # Rate Type tax_schedule. Tax is applied to the total SI net (room +
+        # services) to match the current Checked In tax-compute convention
+        # (_compute_tax uses total_charges = rate_lines + services).
+        net_total_for_tax = round(room_net_total + service_net_total, 2)
+        total_tax = 0.0
+        if net_total_for_tax > 0:
+            for tax_account, amount in (self._compute_tax_breakdown(net_total_for_tax) or []):
+                amount = flt(amount)
+                if amount <= 0:
+                    continue
+                if not tax_account:
+                    frappe.log_error(
+                        title=f"iHotel: Sales Invoice tax row missing tax_account — {self.name}",
+                        message=(
+                            f"Stay {self.name}: Rate Type tax_schedule has a row without "
+                            "an ERPXpand Tax Account. Checkout Sales Invoice skipped tax for "
+                            "this row — set the Tax Account on every Rate Tax Schedule row."
+                        ),
+                    )
+                    continue
+                invoice.append("taxes", {
+                    "charge_type": "Actual",
+                    "account_head": tax_account,
+                    "description": _("Tax"),
+                    "tax_amount": amount,
+                })
+                total_tax += amount
+
+        # Reconciliation: SI gross (items + tax) vs folio gross (folio rows
+        # are tax-inclusive for Room Charge, net for services). Log when
+        # drift > 0.02; ERPNext's rounding_adjustment handles ≤0.02 drift.
+        folio_gross = 0.0
+        for c in (profile.charges or []):
+            if skip_room_on_invoice and c.charge_type == "Room Charge":
+                continue
+            folio_gross += flt(c.amount)
+        si_gross = round(room_net_total + service_net_total + total_tax, 2)
+        if abs(round(folio_gross, 2) - si_gross) > 0.02:
+            frappe.log_error(
+                title=f"iHotel: Sales Invoice / folio reconciliation drift — {self.name}",
+                message=(
+                    f"Stay {self.name}: folio gross {folio_gross:.2f} vs SI gross "
+                    f"{si_gross:.2f} — drift {(folio_gross - si_gross):+.2f}."
+                ),
+            )
+
         invoice.insert(ignore_permissions=True)
         invoice.submit()
         return invoice
 
-    def _create_payment_entries(self, profile, invoice, customer, company):
-        """Create a Payment Entry for each folio payment, allocated to the invoice."""
+    def _sync_folio_payments(self, profile, customer, company, invoice=None):
+        """Create ERPXpand Payment Entries for folio payments not yet synced.
+
+        Idempotent: folio rows that already have `payment_entry` set are skipped.
+        When `invoice` is provided, the PE is allocated against it (SI mode).
+        When `invoice` is None, the PE is a standalone Receive against the
+        Customer AR (JE mode — room revenue already hit AR via the Night Audit JE).
+
+        Per-row exceptions are logged and the batch continues. Returns the list
+        of newly-created Payment Entry names.
+        """
         from frappe.utils import flt, nowdate
 
-        _mode_map = {
-            "Cash": "Cash",
-            "Visa": "Credit Card",
-            "Mastercard": "Credit Card",
-            "Amex": "Credit Card",
-            "Bank Transfer": "Bank Transfer",
-            "Cheque": "Cheque",
-            "City Ledger": "Bank Transfer",
-            "Complimentary": "Cash",
-        }
-
-        for payment in profile.payments:
-            amount = flt(payment.rate)
-            if not amount:
+        created = []
+        failed = []  # per-row failure details for the caller / user
+        for payment in (profile.payments or []):
+            if payment.get("payment_entry"):
                 continue
+            # Convert to company currency so AR reconciliation works in a
+            # single currency. The folio row keeps the original Amount +
+            # Currency as an audit trail for the guest receipt.
+            ex_rate = flt(payment.exchange_rate) or 1
+            amount = round(flt(payment.rate) * ex_rate, 2)
+            if amount <= 0:
+                continue
+
+            # payment.payment_method is now a Link to Mode of Payment, so
+            # the stored value passes straight to the PE — no translation.
+            mode = payment.payment_method or _DEFAULT_MODE_OF_PAYMENT
+
             try:
-                mode = _mode_map.get(payment.payment_method, "Cash")
+                # Resolve the paid_to account from the Mode of Payment's
+                # company-specific default. ERPNext normally fills this in
+                # validate(), but when we build the PE programmatically with
+                # references attached, the order-of-operations occasionally
+                # leaves paid_to unset — preempt that here.
+                paid_to_acct = frappe.db.get_value(
+                    "Mode of Payment Account",
+                    {"parent": mode, "company": company},
+                    "default_account",
+                )
+                paid_to_currency = (
+                    frappe.db.get_value("Account", paid_to_acct, "account_currency")
+                    if paid_to_acct else None
+                ) or _company_currency(company)
+
+                row_currency = payment.currency or _company_currency(company)
+                row_amount   = flt(payment.rate)  # amount in the row's currency
+
                 pe = frappe.new_doc("Payment Entry")
-                pe.payment_type     = "Receive"
-                pe.company          = company
-                pe.mode_of_payment  = mode
-                pe.posting_date     = payment.date or nowdate()
-                pe.party_type       = "Customer"
-                pe.party            = customer
-                pe.paid_amount      = amount
-                pe.received_amount  = amount
-                pe.append("references", {
-                    "reference_doctype": "Sales Invoice",
-                    "reference_name": invoice.name,
-                    "allocated_amount": amount,
-                })
+                pe.payment_type    = "Receive"
+                pe.company         = company
+                pe.mode_of_payment = mode
+                pe.posting_date    = payment.date or nowdate()
+                pe.party_type      = "Customer"
+                pe.party           = customer
+                if paid_to_acct:
+                    pe.paid_to = paid_to_acct
+
+                # Multi-currency routing. ERPNext's Payment Entry semantics:
+                #   paid_amount     → in paid_from's currency (off the AR)
+                #   received_amount → in paid_to's currency   (into the bank)
+                #   base_paid_amount     = paid_amount × source_exchange_rate
+                #   base_received_amount = received_amount × target_exchange_rate
+                # source_exchange_rate converts paid_from → company (= 1 here
+                # since AR is always in company currency for iHotel).
+                pe.source_exchange_rate = 1
+                if paid_to_currency == row_currency:
+                    # Guest paid USD 85 into a USD-denominated bank account.
+                    # paid_from (GHS Debtors) gets 1020 GHS taken off; paid_to
+                    # (USD Ecobank) gets 85 USD added.
+                    pe.paid_amount          = amount       # GHS off AR
+                    pe.received_amount      = row_amount   # USD into bank
+                    pe.target_exchange_rate = ex_rate      # USD → GHS
+                elif paid_to_currency == _company_currency(company):
+                    # Front desk physically converted the foreign currency
+                    # before dropping it into the GHS cash drawer / bank.
+                    # paid_to is in base; both amounts are base-currency equiv.
+                    pe.paid_amount          = amount
+                    pe.received_amount      = amount
+                    pe.target_exchange_rate = 1
+                else:
+                    # paid_to is in a third currency that doesn't match either
+                    # the row currency or the company currency. Ambiguous; fall
+                    # back to base amounts so we don't mis-post.
+                    pe.paid_amount          = amount
+                    pe.received_amount      = amount
+                    pe.target_exchange_rate = 1
+                # Bank-type Modes of Payment (Credit Card, Cheque, Wire
+                # Transfer, etc.) require a Reference No + Reference Date.
+                # Fill from payment.detail (user-entered, e.g. "Visa 4321") or
+                # synthesize from the folio row's own name. Harmless for
+                # Cash-type modes.
+                pe.reference_no = (
+                    (payment.get("detail") or "").strip()
+                    or f"IHOTEL-{payment.parent}-{payment.name[:8]}"
+                )
+                pe.reference_date = payment.date or nowdate()
+                if invoice is not None:
+                    pe.append("references", {
+                        "reference_doctype": "Sales Invoice",
+                        "reference_name":    invoice.name,
+                        "allocated_amount":  amount,
+                    })
                 pe.insert(ignore_permissions=True)
                 pe.submit()
-            except Exception as e:
-                frappe.log_error(
-                    f"iHotel: Could not create Payment Entry for stay {self.name}: {str(e)}"
+                frappe.db.set_value(
+                    "Payment Items", payment.name, "payment_entry", pe.name,
+                    update_modified=False,
                 )
+                payment.payment_entry = pe.name
+                created.append(pe.name)
+            except Exception as e:
+                err_msg = str(e)[:500]
+                frappe.log_error(
+                    f"iHotel: Payment Entry sync failed for stay {self.name}, "
+                    f"folio row {payment.name} ({mode} {amount} {payment.currency or ''}): {err_msg}"
+                )
+                # Drop the failed row from the folio so total_payments reflects
+                # only what actually hit GL. Without this, the folio claims the
+                # guest settled while AR says otherwise. SQL-delete bypasses
+                # the profile's delete-guard (the row never had a PE link, so
+                # the guard wouldn't fire anyway, but we want to avoid any
+                # Frappe child-row lifecycle surprises here).
+                try:
+                    frappe.db.sql(
+                        "DELETE FROM `tabPayment Items` WHERE name = %s",
+                        payment.name,
+                    )
+                except Exception:
+                    pass
+                failed.append({
+                    "method": mode,
+                    "amount": flt(payment.rate),
+                    "currency": payment.currency or "",
+                    "error": err_msg,
+                })
+
+        # Publish failures through frappe.flags so the top-level caller
+        # (take_payment API) can surface them in its response + alert the
+        # user on the UI. Also msgprint directly so users who save the
+        # profile form manually see the issue immediately.
+        if failed:
+            existing = getattr(frappe.flags, "ihotel_payment_failures", None) or []
+            frappe.flags.ihotel_payment_failures = existing + failed
+            from frappe import _
+
+            # Profile totals were computed + committed BEFORE this sync ran
+            # (on_update fires post-save). We SQL-deleted the failed rows,
+            # so total_payments / outstanding / status on the profile are
+            # now stale — recompute and write via db.set_value so we don't
+            # re-trigger validate/on_update recursion.
+            profile.reload()
+            profile.recalculate_amounts()
+            profile.update_status()
+            frappe.db.set_value(
+                "iHotel Profile", profile.name,
+                {
+                    "total_amount":        profile.total_amount,
+                    "total_payments":      profile.total_payments,
+                    "outstanding_balance": profile.outstanding_balance,
+                    "status":              profile.status,
+                },
+                update_modified=False,
+            )
+
+            lines = [
+                _("{method} {amount} {currency} — {error}").format(**f)
+                for f in failed
+            ]
+            frappe.msgprint(
+                _("Some payments could not be posted to ERPXpand and have been removed from the folio. Fix the configuration below and take the payment again.") + "<br><br>" + "<br>".join(lines),
+                title=_("Payment Posting Failed"),
+                indicator="red",
+            )
+        return created
+
+    def _create_payment_entries(self, profile, invoice, customer, company):
+        """Back-compat shim — delegates to _sync_folio_payments."""
+        return self._sync_folio_payments(profile, customer, company, invoice=invoice)
+
+    def _sync_folio_payments_from_profile(self, profile):
+        """Entry point used by iHotel Profile.on_update when a folio is Settled.
+
+        Resolves settings + customer + (optional) SI, then delegates to
+        _sync_folio_payments. Silent on misconfiguration so profile saves
+        never break from a downstream sync issue.
+        """
+        try:
+            if "erpnext" not in frappe.get_installed_apps():
+                return
+            settings = frappe.get_single("iHotel Settings")
+            if not settings.get("enable_accounting_integration"):
+                return
+            company = settings.company
+            if not company:
+                return
+            customer = self._get_or_create_customer(settings, company)
+            if not customer:
+                return
+
+            invoice = None
+            if self.sales_invoice:
+                try:
+                    candidate = frappe.get_doc("Sales Invoice", self.sales_invoice)
+                    if candidate.docstatus == 1:
+                        invoice = candidate
+                except frappe.DoesNotExistError:
+                    invoice = None
+
+            self._sync_folio_payments(profile, customer, company, invoice=invoice)
+        except Exception as e:
+            frappe.log_error(
+                f"iHotel: folio-triggered Payment Entry sync failed for stay "
+                f"{self.name}: {e!s}"
+            )
+
+
+def on_payment_entry_cancel(doc, method=None):
+    """Cascade a Payment Entry cancellation back to any iHotel folio row.
+
+    When a PE linked to a folio payment row is cancelled, its GL entries are
+    reversed — the money no longer exists on AR. The folio must reflect that:
+    remove the row so `recalculate_amounts` drops the amount from
+    `total_payments` and the profile transitions back to Open if it was
+    Settled only because of this PE.
+
+    Runs via hooks.py `doc_events` → `Payment Entry.on_cancel`.
+    """
+    rows = frappe.db.get_all(
+        "Payment Items",
+        filters={"payment_entry": doc.name, "parenttype": "iHotel Profile"},
+        fields=["name", "parent"],
+    )
+    if not rows:
+        return
+
+    affected_profiles = set()
+    for row in rows:
+        # SQL delete bypasses the validate_linked_payment_rows_preserved guard
+        # on iHotel Profile — that guard is meant to block *user* deletions,
+        # not the PE-cancel cleanup path.
+        frappe.db.sql(
+            "DELETE FROM `tabPayment Items` WHERE name = %s",
+            row.name,
+        )
+        affected_profiles.add(row.parent)
+
+    for profile_name in affected_profiles:
+        try:
+            profile = frappe.get_doc("iHotel Profile", profile_name)
+            # Save to recompute totals + flip status back to Open when a
+            # settled folio loses its payment. on_update cascade is a no-op
+            # since no unsynced rows remain.
+            profile.save(ignore_permissions=True)
+        except Exception as e:
+            frappe.log_error(
+                f"iHotel: could not refresh profile {profile_name} after "
+                f"Payment Entry {doc.name} cancel: {e!s}"
+            )
+
+
+@frappe.whitelist()
+def take_payment(checked_in, payments, also_checkout=False):
+    """Append payments to a stay's folio and sync them to ERPXpand Payment Entries.
+
+    Used by the Take Payment dialog on the Checked In form. Accepts a JSON
+    string or a list for `payments` (each row: date / payment_method / amount /
+    detail / payment_status). When `also_checkout` is truthy and the folio
+    settles (outstanding <= 0), runs the existing do_checkout flow so
+    front desk can settle + check out in one submit.
+
+    Returns {profile, outstanding, payment_entries, checked_out}.
+    """
+    import json
+    from frappe.utils import flt, nowdate
+
+    if isinstance(payments, str):
+        payments = json.loads(payments or "[]")
+    if not isinstance(payments, list):
+        frappe.throw(_("payments must be a list of payment rows."))
+    if isinstance(also_checkout, str):
+        also_checkout = also_checkout.lower() in ("1", "true", "yes", "y")
+
+    stay = frappe.get_doc("Checked In", checked_in)
+    if stay.docstatus != 1:
+        frappe.throw(_("Payments can only be taken on a submitted stay."))
+
+    # Ensure folio exists; reuse the whitelisted helper so any existing
+    # onboarding rules (e.g. iHotel Profile defaults) are honoured.
+    if not stay.profile:
+        create_folio(stay.name)
+        stay.reload()
+
+    profile = frappe.get_doc("iHotel Profile", stay.profile)
+
+    for p in payments:
+        amount = flt(p.get("amount") or p.get("rate"))
+        if amount <= 0:
+            continue
+        currency = p.get("currency") or frappe.db.get_value(
+            "Company", stay.get("company") or frappe.db.get_single_value("iHotel Settings", "company"),
+            "default_currency",
+        )
+        exchange_rate = flt(p.get("exchange_rate")) or 1
+        profile.append("payments", {
+            "date":           p.get("date") or nowdate(),
+            "payment_method": p.get("payment_method") or "Cash",
+            "currency":       currency,
+            "exchange_rate":  exchange_rate,
+            "rate":           amount,
+            "detail":         p.get("detail") or "",
+            "payment_status": p.get("payment_status") or "Paid",
+        })
+
+    # validate() recalculates totals and auto-flips status; on_update triggers
+    # _sync_folio_payments_from_profile → Payment Entries post there. Failed
+    # rows are removed from the folio inside the sync, so after reload()
+    # totals reflect only what actually posted to GL.
+    frappe.flags.ihotel_payment_failures = []  # isolate failures from this call
+    profile.save(ignore_permissions=True)
+    profile.reload()
+
+    pe_names = [row.payment_entry for row in profile.payments if row.payment_entry]
+    failures = list(frappe.flags.get("ihotel_payment_failures") or [])
+    frappe.flags.ihotel_payment_failures = []
+
+    checked_out = False
+    if also_checkout and not failures and flt(profile.outstanding_balance) <= 0:
+        do_checkout(stay.name)
+        checked_out = True
+
+    return {
+        "profile": profile.name,
+        "outstanding": flt(profile.outstanding_balance),
+        "payment_entries": pe_names,
+        "failed_payments": failures,
+        "checked_out": checked_out,
+    }

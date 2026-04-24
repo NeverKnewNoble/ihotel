@@ -108,6 +108,32 @@ class NightAudit(Document):
         self.run_night_audit()
         self._post_erpnext_journal_for_night_audit()
 
+    def on_cancel(self):
+        """
+        Cascade-cancel the linked ERPXpand Journal Entry so room revenue isn't
+        left posted to GL when the audit is reversed. The reference field is
+        kept populated for audit trail — the cancelled JE is still reachable.
+        """
+        je_name = self.erpnext_journal_entry
+        if not je_name:
+            return
+        try:
+            je = frappe.get_doc("Journal Entry", je_name)
+        except frappe.DoesNotExistError:
+            return
+        if je.docstatus != 1:
+            return
+        try:
+            je.flags.ignore_permissions = True
+            je.cancel()
+        except Exception as e:
+            frappe.log_error(
+                f"Night audit cancel: failed to cancel linked JE {je_name} for {self.name} — {e!s}"
+            )
+            frappe.throw(
+                _("Could not cancel the linked ERPXpand Journal Entry {0}. See Error Log.").format(je_name)
+            )
+
     def run_night_audit(self):
         """
         Post one nightly room charge per guest who is in-house on the audit date.
@@ -237,9 +263,12 @@ class NightAudit(Document):
 
     def _post_erpnext_journal_for_night_audit(self):
         """
-        When ERPXpand (ERPNext) is installed and iHotel Settings opt-in is on, post one Journal Entry
-        for in-house room revenue (Dr receivable / Cr room revenue). Checkout Sales Invoices should
-        omit Room Charge lines (same setting) so revenue is not doubled.
+        When ERPXpand (ERPNext) is installed and iHotel Settings opt-in is on, post one Journal
+        Entry for in-house room revenue. Each stay contributes a gross AR debit (net rate + tax).
+        The entry balances with a Cr on the room revenue account (net total) plus one Cr per
+        distinct tax_account from the stay's Rate Type tax_schedule, aggregated across all stays.
+
+        Checkout Sales Invoices omit Room Charge lines (same setting) so revenue is not doubled.
         """
         if "erpnext" not in frappe.get_installed_apps():
             return
@@ -257,8 +286,8 @@ class NightAudit(Document):
 
         company = settings.company
         ar_acct = settings.accounts_receivable_account
-        # Room revenue account now comes from the Income Accounts table on Settings,
-        # keyed by charge_type = "Room Charge". Supports hotels with multiple revenue streams.
+        # Room revenue account comes from the Income Accounts table on Settings,
+        # keyed by charge_type = "Room Charge". Supports multi-revenue-stream properties.
         rev_acct = resolve_income_account("Room Charge", company)
         if not all([company, ar_acct, rev_acct]):
             frappe.msgprint(
@@ -271,8 +300,9 @@ class NightAudit(Document):
         audit_date = self.audit_date
         rows = get_stays_in_house_on(audit_date)
 
-        total_credit = 0.0
-        debit_entries = []
+        total_revenue = 0.0
+        tax_by_account = {}   # {tax_account: amount_total} aggregated across stays
+        debit_entries = []    # list of (gross, cust) — AR debit = net + tax per stay
 
         for row in rows:
             stay = frappe.get_doc("Checked In", row.name)
@@ -283,10 +313,26 @@ class NightAudit(Document):
             if not cust:
                 frappe.log_error(f"Night audit JE: no ERPXpand Customer for stay {stay.name}")
                 continue
-            debit_entries.append((rate, cust))
-            total_credit += rate
 
-        if total_credit <= 0:
+            stay_tax = 0.0
+            for acct, amt in stay._compute_tax_breakdown(rate):
+                if amt <= 0:
+                    continue
+                if not acct:
+                    frappe.msgprint(
+                        _("Rate Type used by stay {0} has a tax_schedule row without an ERPXpand Tax Account. Set the Tax Account on every Rate Tax Schedule row to post night audit to ERPXpand.").format(stay.name),
+                        indicator="orange",
+                        title=_("ERPXpand Journal Entry skipped"),
+                    )
+                    return
+                tax_by_account[acct] = tax_by_account.get(acct, 0.0) + amt
+                stay_tax += amt
+
+            gross = round(rate + stay_tax, 2)
+            debit_entries.append((gross, cust))
+            total_revenue += rate
+
+        if total_revenue <= 0:
             return
 
         try:
@@ -296,14 +342,14 @@ class NightAudit(Document):
             je.posting_date = audit_date
             je.user_remark = _("Night audit room revenue — {0}").format(self.name)
 
-            for rate, cust in debit_entries:
+            for gross, cust in debit_entries:
                 je.append(
                     "accounts",
                     {
                         "account": ar_acct,
                         "party_type": "Customer",
                         "party": cust,
-                        "debit_in_account_currency": rate,
+                        "debit_in_account_currency": gross,
                         "credit_in_account_currency": 0,
                     },
                 )
@@ -313,9 +359,22 @@ class NightAudit(Document):
                 {
                     "account": rev_acct,
                     "debit_in_account_currency": 0,
-                    "credit_in_account_currency": total_credit,
+                    "credit_in_account_currency": round(total_revenue, 2),
                 },
             )
+
+            for acct, amt in tax_by_account.items():
+                amt = round(amt, 2)
+                if amt <= 0:
+                    continue
+                je.append(
+                    "accounts",
+                    {
+                        "account": acct,
+                        "debit_in_account_currency": 0,
+                        "credit_in_account_currency": amt,
+                    },
+                )
 
             je.insert(ignore_permissions=True)
             je.submit()
