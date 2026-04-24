@@ -26,7 +26,7 @@ def get_discrepancies():
 	active_by_room = {s.room: s for s in active_stays}
 
 	discrepancies = []
-	clean_statuses = {"Available", "Dirty", "Pickup", "Inspected", "Housekeeping"}
+	clean_statuses = {"Available"}
 
 	for room in rooms:
 		stay = active_by_room.get(room["name"])

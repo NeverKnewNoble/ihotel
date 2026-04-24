@@ -102,11 +102,11 @@ class IHotelDashboard {
 					<div class="ih-card-body">
 						<div id="ih-room-chart" class="ih-chart-container"></div>
 						<div class="ih-status-bars" style="margin-top: 16px;">
-							${this.status_bar("Available",    d.room_status.Available,    d.total_rooms, "available")}
-							${this.status_bar("Occupied",     d.room_status.Occupied,     d.total_rooms, "occupied")}
-							${this.status_bar("Dirty",        d.room_status.Dirty,        d.total_rooms, "dirty")}
-							${this.status_bar("Housekeeping", d.room_status.Housekeeping, d.total_rooms, "housekeeping")}
-							${this.status_bar("Out of Order", d.room_status["Out of Order"], d.total_rooms, "out-of-order")}
+							${this.status_bar("Available",      d.room_status.Available,           d.total_rooms, "available")}
+							${this.status_bar("Occupied",       d.room_status.Occupied,            d.total_rooms, "occupied")}
+							${this.status_bar("Vacant Dirty",   d.room_status["Vacant Dirty"],     d.total_rooms, "vacant-dirty")}
+							${this.status_bar("Occupied Dirty", d.room_status["Occupied Dirty"],   d.total_rooms, "occupied-dirty")}
+							${this.status_bar("Out of Order",   d.room_status["Out of Order"],     d.total_rooms, "out-of-order")}
 						</div>
 					</div>
 				</div>
@@ -303,7 +303,7 @@ class IHotelDashboard {
 		if (!chart_el) return;
 
 		const rs = d.room_status;
-		const vals = [rs.Available, rs.Occupied, rs.Dirty, rs.Housekeeping, rs["Out of Order"]];
+		const vals = [rs.Available, rs.Occupied, rs["Vacant Dirty"], rs["Occupied Dirty"], rs["Out of Order"]];
 		if (!vals.some(v => v > 0)) {
 			chart_el.innerHTML = '<div class="ih-empty">No room data</div>';
 			return;
@@ -311,12 +311,12 @@ class IHotelDashboard {
 
 		this.chart = new frappe.Chart(chart_el, {
 			data: {
-				labels: ["Available", "Occupied", "Dirty", "Housekeeping", "Out of Order"],
+				labels: ["Available", "Occupied", "Vacant Dirty", "Occupied Dirty", "Out of Order"],
 				datasets: [{ values: vals }],
 			},
 			type: "donut",
 			height: 220,
-			colors: ["#10b981", "#3b82f6", "#f97316", "#f59e0b", "#ef4444"],
+			colors: ["#10b981", "#3b82f6", "#fb923c", "#f97316", "#ef4444"],
 		});
 	}
 }

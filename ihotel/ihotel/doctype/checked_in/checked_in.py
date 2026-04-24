@@ -273,7 +273,7 @@ def move_room(checked_in_name, new_room, reason=None):
 
 	# Confirm the destination room is ready
 	new_room_doc = frappe.get_doc("Room", new_room)
-	READY = {"Available", "Inspected", "Vacant Clean", "Housekeeping"}
+	READY = {"Available", "Vacant Dirty"}
 	if new_room_doc.status not in READY:
 		frappe.throw(_("Room {0} is not available for a room move (current status: {1}).").format(
 			new_room, new_room_doc.status
@@ -373,10 +373,10 @@ def get_rooms_for_room_type(doctype, txt, searchfield, start, page_len, filters)
 		conditions.append("room_type = %s")
 		values.append(room_type)
 
-	# Only show rooms that are ready to sell (Available, Vacant Clean, or
-	# Inspected). Prevents the front desk from assigning a room that is
-	# occupied, dirty, being cleaned, or out of service.
-	conditions.append("status IN ('Available', 'Vacant Clean', 'Inspected')")
+	# Only show rooms that are bookable: Available or Vacant Dirty (housekeeping will
+	# clean before the guest arrives). Prevents assigning a room that is occupied
+	# or out of service.
+	conditions.append("status IN ('Available', 'Vacant Dirty')")
 
 	where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
@@ -560,7 +560,7 @@ class CheckedIn(Document):
 
         # Block rooms that are physically unavailable for a new stay.
         # Vacant Dirty is intentionally allowed — the room is free, housekeeping will clean before guest goes up.
-        UNAVAILABLE = ("Out of Order", "Out of Service", "Occupied", "Occupied Dirty", "Occupied Clean")
+        UNAVAILABLE = ("Out of Order", "Out of Service", "Occupied", "Occupied Dirty")
         if room_status in UNAVAILABLE:
             frappe.throw(
                 _("Room {0} is {1} and cannot be booked.").format(self.room, room_status)
@@ -914,7 +914,7 @@ class CheckedIn(Document):
 
             if not active_stay_exists:
                 room = frappe.get_doc("Room", self.room)
-                if room.status not in ("Vacant Dirty", "Vacant Clean"):
+                if room.status != "Vacant Dirty":
                     room.status = "Vacant Dirty"
                     room.save(ignore_permissions=True)
         except Exception as e:
