@@ -20,7 +20,12 @@ def _ihotel_effective_erpnext_installed():
 
 
 def _ihotel_sidebar_remove_standalone_ledger(items, erpnext_installed):
-	"""Drop Hotel Account + Trial Balance when ERPNext provides the real GL."""
+	"""Drop the Hotel Account standalone ledger link when ERPXpand is effectively installed.
+
+	The Trial Balance page is kept visible in both modes: it now queries the real
+	ERPNext GL (tabGL Entry), so it is useful whether the client uses ERPXpand as
+	their primary accounting system or exports the balance for an external system.
+	"""
 	if not erpnext_installed or not items:
 		return items
 	out = []
@@ -28,8 +33,6 @@ def _ihotel_sidebar_remove_standalone_ledger(items, erpnext_installed):
 		lt = it.get("link_type")
 		lk = it.get("link_to")
 		if lt == "DocType" and lk == "Hotel Account":
-			continue
-		if lt == "Page" and lk == "trial_balance":
 			continue
 		out.append(it)
 	return out

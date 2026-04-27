@@ -189,6 +189,12 @@ doc_events = {
 	"Checked In": {
 		"on_update_after_submit": "ihotel.notifications.on_hotel_stay_update",
 	},
+	"Payment Entry": {
+		# When a Payment Entry that settled a folio is cancelled, the GL
+		# entries are reversed; the matching Payment Items row on the folio
+		# must also go so totals stay in sync with AR.
+		"on_cancel": "ihotel.ihotel.doctype.checked_in.checked_in.on_payment_entry_cancel",
+	},
 	# Reservation confirmation is handled by the "Reservation Confirmation Letter" Notification fixture
 }
 
