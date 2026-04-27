@@ -1,174 +1,204 @@
-import frappe
-from frappe.utils import getdate, flt, formatdate
-from datetime import datetime, timedelta
 import json
+from datetime import datetime
 
-from ihotel.ihotel.doctype.charge_type.charge_type import resolve_hotel_account_for_charge_type
+import frappe
+from frappe import _
+from frappe.utils import flt, getdate
+
+
+def _parse_filters(filters):
+	"""Accept a filters arg as dict or JSON string; return a dict."""
+	if not filters:
+		return {}
+	if isinstance(filters, str):
+		try:
+			return json.loads(filters)
+		except Exception:
+			return {}
+	return dict(filters)
+
+
+def _require_company(filters):
+	company = filters.get("company")
+	if not company:
+		frappe.throw(_("Company is required to generate a Trial Balance."))
+	return company
+
 
 @frappe.whitelist()
 def get_trial_balance_data(filters=None):
-    """Get trial balance data based on filters"""
-    if not filters:
-        filters = {}
-    
-    try:
-        filters = json.loads(filters) if isinstance(filters, str) else filters
-    except:
-        filters = {}
-    
-    # Get date range
-    from_date = filters.get('from_date')
-    to_date = filters.get('to_date')
-    
-    if not from_date:
-        from_date = getdate(datetime.now().replace(day=1)).strftime('%Y-%m-%d')
-    if not to_date:
-        to_date = getdate().strftime('%Y-%m-%d')
-    
-    # Get all hotel accounts
-    accounts = frappe.db.sql("""
-        SELECT name, account_name, account_code, account_type, is_group, parent_account
-        FROM `tabHotel Account`
-        ORDER BY account_code ASC
-    """, as_dict=True)
-    
-    trial_balance = []
-    total_debit = 0
-    total_credit = 0
-    
-    for account in accounts:
-        if account.is_group:
-            # Get summary for group accounts
-            debit, credit = get_account_balance(account.name, from_date, to_date, is_group=True)
-        else:
-            # Get balance for leaf accounts
-            debit, credit = get_account_balance(account.name, from_date, to_date)
-        
-        if debit > 0 or credit > 0:
-            trial_balance.append({
-                'account_code': account.account_code or '',
-                'account_name': account.account_name,
-                'account_type': account.account_type,
-                'debit': round(debit, 2),
-                'credit': round(credit, 2),
-                'is_group': account.is_group
-            })
-            total_debit += debit
-            total_credit += credit
-    
-    return {
-        'trial_balance': trial_balance,
-        'total_debit': round(total_debit, 2),
-        'total_credit': round(total_credit, 2),
-        'from_date': from_date,
-        'to_date': to_date,
-        'is_balanced': abs(total_debit - total_credit) < 0.01
-    }
+	"""Trial balance over ERPNext GL Entry, scoped to a company and period.
 
-def _folio_amount_for_hotel_account(account_name, from_date, to_date):
-    """
-    Sum Folio Charge amounts that map to this Hotel Account through Charge Type configuration.
-    Folio rows live on iHotel Profile; join through Checked In (submitted stays only).
-    """
-    rows = frappe.db.sql(
-        """
-        SELECT
-            fc.charge_type,
-            COALESCE(SUM(fc.amount), 0) AS total
-        FROM `tabFolio Charge` fc
-        INNER JOIN `tabiHotel Profile` p ON p.name = fc.parent
-        INNER JOIN `tabChecked In` ci ON ci.name = p.hotel_stay AND ci.docstatus = 1
-        WHERE fc.charge_date BETWEEN %s AND %s
-        GROUP BY fc.charge_type
-        """,
-        (from_date, to_date),
-        as_dict=True,
-    )
+	Filters dict / JSON:
+		company       (required)  — ERPNext Company
+		from_date     (optional)  — default: 1st of current month
+		to_date       (optional)  — default: today
+		finance_book  (optional)
+		account_type  (optional)  — filter output to one root_type
 
-    gross = 0.0
-    for row in rows:
-        mapped_account = resolve_hotel_account_for_charge_type(row.charge_type)
-        if mapped_account == account_name:
-            gross += flt(row.total)
+	Returns a list of per-account rows (both leaf and group accounts) with
+	debit / credit columns, plus totals. Group accounts aggregate their
+	descendants via the nested-set convention on tabAccount (lft / rgt).
+	"""
+	filters = _parse_filters(filters)
+	company = _require_company(filters)
 
-    return flt(gross)
+	from_date = filters.get("from_date") or getdate(
+		datetime.now().replace(day=1)
+	).strftime("%Y-%m-%d")
+	to_date = filters.get("to_date") or getdate().strftime("%Y-%m-%d")
+	finance_book = filters.get("finance_book")
+	account_type_filter = filters.get("account_type")
 
+	# Only leaf accounts — the user doesn't want group-rollup rows in the
+	# Trial Balance output. Totals are computed from leaves either way.
+	accounts = frappe.db.sql(
+		"""
+		SELECT name, account_name, account_number, root_type, is_group,
+		       lft, rgt, parent_account
+		FROM `tabAccount`
+		WHERE company = %(company)s AND is_group = 0
+		ORDER BY lft
+		""",
+		{"company": company},
+		as_dict=True,
+	)
 
-def _debit_credit_from_amount(account_type, amount):
-    """Map signed folio total to trial balance debit/credit columns by Hotel Account classification."""
-    amt = flt(amount)
-    if not amt:
-        return 0.0, 0.0
-    if account_type == "Revenue":
-        return 0.0, amt
-    if account_type in ("Expense", "Asset"):
-        return amt, 0.0
-    if account_type in ("Liability", "Equity"):
-        return 0.0, amt
-    # Payment, City Ledger, blank — treat as debit-like for folio charges
-    return amt, 0.0
+	empty_response = {
+		"trial_balance": [],
+		"total_debit": 0.0,
+		"total_credit": 0.0,
+		"from_date": from_date,
+		"to_date": to_date,
+		"company": company,
+		"is_balanced": True,
+	}
+	if not accounts:
+		return empty_response
 
+	gl_args = {
+		"company": company,
+		"from_date": from_date,
+		"to_date": to_date,
+	}
+	gl_sql = """
+		SELECT account, SUM(debit) AS debit, SUM(credit) AS credit
+		FROM `tabGL Entry`
+		WHERE company = %(company)s
+		  AND posting_date BETWEEN %(from_date)s AND %(to_date)s
+		  AND is_cancelled = 0
+	"""
+	if finance_book:
+		gl_sql += " AND finance_book = %(finance_book)s"
+		gl_args["finance_book"] = finance_book
+	gl_sql += " GROUP BY account"
 
-def get_account_balance(account_name, from_date, to_date, is_group=False):
-    """Calculate debit and credit balance for an account"""
-    if is_group:
-        child_accounts = frappe.db.sql(
-            """
-            WITH RECURSIVE subs AS (
-                SELECT name FROM `tabHotel Account` WHERE parent_account = %s
-                UNION ALL
-                SELECT a.name FROM `tabHotel Account` a
-                INNER JOIN subs s ON a.parent_account = s.name
-            )
-            SELECT name FROM subs
-            """,
-            (account_name,),
-            as_dict=True,
-        )
+	leaf_totals = {
+		row.account: (flt(row.debit), flt(row.credit))
+		for row in frappe.db.sql(gl_sql, gl_args, as_dict=True)
+	}
 
-        total_debit = 0.0
-        total_credit = 0.0
+	trial_balance = []
+	total_debit = 0.0
+	total_credit = 0.0
 
-        for child in child_accounts:
-            child_debit, child_credit = get_account_balance(child.name, from_date, to_date)
-            total_debit += child_debit
-            total_credit += child_credit
+	for a in accounts:
+		debit, credit = leaf_totals.get(a.name, (0.0, 0.0))
 
-        return total_debit, total_credit
+		if account_type_filter and a.root_type != account_type_filter:
+			continue
 
-    account_type = frappe.db.get_value("Hotel Account", account_name, "account_type")
-    gross = _folio_amount_for_hotel_account(account_name, from_date, to_date)
-    return _debit_credit_from_amount(account_type, gross)
+		if abs(debit) < 0.005 and abs(credit) < 0.005:
+			continue
+
+		trial_balance.append({
+			"account": a.name,
+			"account_number": a.account_number or "",
+			"account_name": a.account_name,
+			"root_type": a.root_type or "",
+			"is_group": False,
+			"debit": round(debit, 2),
+			"credit": round(credit, 2),
+		})
+
+		total_debit += debit
+		total_credit += credit
+
+	return {
+		"trial_balance": trial_balance,
+		"total_debit": round(total_debit, 2),
+		"total_credit": round(total_credit, 2),
+		"from_date": from_date,
+		"to_date": to_date,
+		"company": company,
+		"is_balanced": abs(total_debit - total_credit) < 0.01,
+	}
+
 
 @frappe.whitelist()
-def get_account_filter_options():
-    """Get account options for filters"""
-    accounts = frappe.db.sql("""
-        SELECT name, account_name, account_type
-        FROM `tabHotel Account`
-        WHERE is_group = 0
-        ORDER BY account_code ASC
-    """, as_dict=True)
-    
-    account_types = frappe.db.sql("""
-        SELECT DISTINCT account_type FROM `tabHotel Account` ORDER BY account_type
-    """, as_dict=True)
-    
-    return {
-        'accounts': accounts,
-        'account_types': [a.account_type for a in account_types]
-    }
+def get_account_filter_options(company=None):
+	"""Return company-scoped leaf accounts and distinct root types for UI filters."""
+	if not company:
+		return {"accounts": [], "account_types": []}
+
+	accounts = frappe.db.sql(
+		"""
+		SELECT name, account_name, account_number, root_type
+		FROM `tabAccount`
+		WHERE company = %s AND is_group = 0
+		ORDER BY account_number
+		""",
+		(company,),
+		as_dict=True,
+	)
+	root_types = frappe.db.sql(
+		"""
+		SELECT DISTINCT root_type FROM `tabAccount`
+		WHERE company = %s AND root_type IS NOT NULL AND root_type != ''
+		ORDER BY root_type
+		""",
+		(company,),
+		as_dict=True,
+	)
+	return {
+		"accounts": accounts,
+		"account_types": [r.root_type for r in root_types],
+	}
+
+
+def _csv_safe_cell(value):
+	"""Escape a CSV cell: quote, escape embedded quotes, and neutralise formula injection."""
+	s = "" if value is None else str(value)
+	if s and s[0] in ("=", "+", "-", "@", "\t", "\r"):
+		s = "'" + s
+	s = s.replace('"', '""')
+	return '"' + s + '"'
+
 
 @frappe.whitelist()
 def export_trial_balance(filters=None):
-    """Export trial balance to CSV format"""
-    data = get_trial_balance_data(filters)
-    
-    csv_content = "Account Code,Account Name,Account Type,Debit,Credit\n"
-    
-    for entry in data['trial_balance']:
-        csv_content += f"{entry['account_code']},{entry['account_name']},{entry['account_type']},{entry['debit']},{entry['credit']}\n"
-    
-    csv_content += f",,TOTAL,{data['total_debit']},{data['total_credit']}\n"
-    
-    return csv_content
+	"""Render the Trial Balance as CSV, injection-safe."""
+	data = get_trial_balance_data(filters)
+
+	lines = [
+		",".join(
+			_csv_safe_cell(h)
+			for h in ("Account Number", "Account Name", "Root Type", "Debit", "Credit")
+		)
+	]
+	for row in data["trial_balance"]:
+		lines.append(",".join([
+			_csv_safe_cell(row["account_number"]),
+			_csv_safe_cell(row["account_name"]),
+			_csv_safe_cell(row["root_type"]),
+			_csv_safe_cell(f"{row['debit']:.2f}"),
+			_csv_safe_cell(f"{row['credit']:.2f}"),
+		]))
+	lines.append(",".join([
+		_csv_safe_cell(""),
+		_csv_safe_cell(""),
+		_csv_safe_cell("TOTAL"),
+		_csv_safe_cell(f"{data['total_debit']:.2f}"),
+		_csv_safe_cell(f"{data['total_credit']:.2f}"),
+	]))
+	return "\n".join(lines) + "\n"

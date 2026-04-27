@@ -263,14 +263,10 @@ class NightAudit(Document):
 
     def _post_erpnext_journal_for_night_audit(self):
         """
-        When ERPXpand (ERPNext) is installed and iHotel Settings opt-in is on, post one Journal Entry
-        for in-house room revenue. Each stay contributes a gross AR debit (net rate + tax). The entry
-        balances with a Cr on the room revenue account (net total) plus tax credits.
-
-        Tax-credit routing is driven by iHotel Settings.erpnext_presence_test_mode:
-        - "Force: no ERPXpand" → one aggregated Cr on the single Tax Account from Settings.
-        - "Force: ERPXpand included" or "Auto" → one Cr per distinct tax_account from the Rate Type's
-          tax_schedule rows, aggregated across all stays.
+        When ERPXpand (ERPNext) is installed and iHotel Settings opt-in is on, post one Journal
+        Entry for in-house room revenue. Each stay contributes a gross AR debit (net rate + tax).
+        The entry balances with a Cr on the room revenue account (net total) plus one Cr per
+        distinct tax_account from the stay's Rate Type tax_schedule, aggregated across all stays.
 
         Checkout Sales Invoices omit Room Charge lines (same setting) so revenue is not doubled.
         """
@@ -290,8 +286,8 @@ class NightAudit(Document):
 
         company = settings.company
         ar_acct = settings.accounts_receivable_account
-        # Room revenue account now comes from the Income Accounts table on Settings,
-        # keyed by charge_type = "Room Charge". Supports hotels with multiple revenue streams.
+        # Room revenue account comes from the Income Accounts table on Settings,
+        # keyed by charge_type = "Room Charge". Supports multi-revenue-stream properties.
         rev_acct = resolve_income_account("Room Charge", company)
         if not all([company, ar_acct, rev_acct]):
             frappe.msgprint(
@@ -301,18 +297,12 @@ class NightAudit(Document):
             )
             return
 
-        # Auto falls through to the per-tax-schedule path: the JE path only runs when ERPNext
-        # is actually installed (gated above), so Auto effectively means "ERPXpand included".
-        use_single_tax_acct = settings.get("erpnext_presence_test_mode") == "Force: no ERPXpand"
-        settings_tax_acct = settings.get("tax_account")
-
         audit_date = self.audit_date
         rows = get_stays_in_house_on(audit_date)
 
         total_revenue = 0.0
-        total_tax = 0.0
-        tax_by_account = {}  # {tax_account: amount_total} — per-tax-schedule mode only
-        debit_entries = []   # list of (gross, cust) — AR debit is net + tax per stay
+        tax_by_account = {}   # {tax_account: amount_total} aggregated across stays
+        debit_entries = []    # list of (gross, cust) — AR debit = net + tax per stay
 
         for row in rows:
             stay = frappe.get_doc("Checked In", row.name)
@@ -324,38 +314,25 @@ class NightAudit(Document):
                 frappe.log_error(f"Night audit JE: no ERPXpand Customer for stay {stay.name}")
                 continue
 
-            if use_single_tax_acct:
-                stay_tax = flt(stay._compute_tax(rate))
-            else:
-                stay_tax = 0.0
-                for acct, amt in stay._compute_tax_breakdown(rate):
-                    if amt <= 0:
-                        continue
-                    if not acct:
-                        frappe.msgprint(
-                            _("Rate Type used by stay {0} has a tax_schedule row without an ERPXpand Tax Account. Set the Tax Account on every Rate Tax Schedule row to post night audit to ERPXpand.").format(stay.name),
-                            indicator="orange",
-                            title=_("ERPXpand Journal Entry skipped"),
-                        )
-                        return
-                    tax_by_account[acct] = tax_by_account.get(acct, 0.0) + amt
-                    stay_tax += amt
+            stay_tax = 0.0
+            for acct, amt in stay._compute_tax_breakdown(rate):
+                if amt <= 0:
+                    continue
+                if not acct:
+                    frappe.msgprint(
+                        _("Rate Type used by stay {0} has a tax_schedule row without an ERPXpand Tax Account. Set the Tax Account on every Rate Tax Schedule row to post night audit to ERPXpand.").format(stay.name),
+                        indicator="orange",
+                        title=_("ERPXpand Journal Entry skipped"),
+                    )
+                    return
+                tax_by_account[acct] = tax_by_account.get(acct, 0.0) + amt
+                stay_tax += amt
 
             gross = round(rate + stay_tax, 2)
             debit_entries.append((gross, cust))
             total_revenue += rate
-            total_tax += stay_tax
 
         if total_revenue <= 0:
-            return
-
-        total_tax = round(total_tax, 2)
-        if use_single_tax_acct and total_tax > 0 and not settings_tax_acct:
-            frappe.msgprint(
-                _("Rate Types have a tax_schedule but no Tax Account is configured in iHotel Settings. Set a Tax Account to post night audit to ERPXpand."),
-                indicator="orange",
-                title=_("ERPXpand Journal Entry skipped"),
-            )
             return
 
         try:
@@ -386,29 +363,18 @@ class NightAudit(Document):
                 },
             )
 
-            if use_single_tax_acct:
-                if total_tax > 0:
-                    je.append(
-                        "accounts",
-                        {
-                            "account": settings_tax_acct,
-                            "debit_in_account_currency": 0,
-                            "credit_in_account_currency": total_tax,
-                        },
-                    )
-            else:
-                for acct, amt in tax_by_account.items():
-                    amt = round(amt, 2)
-                    if amt <= 0:
-                        continue
-                    je.append(
-                        "accounts",
-                        {
-                            "account": acct,
-                            "debit_in_account_currency": 0,
-                            "credit_in_account_currency": amt,
-                        },
-                    )
+            for acct, amt in tax_by_account.items():
+                amt = round(amt, 2)
+                if amt <= 0:
+                    continue
+                je.append(
+                    "accounts",
+                    {
+                        "account": acct,
+                        "debit_in_account_currency": 0,
+                        "credit_in_account_currency": amt,
+                    },
+                )
 
             je.insert(ignore_permissions=True)
             je.submit()
