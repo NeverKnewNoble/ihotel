@@ -81,12 +81,15 @@ class IHotelDashboard {
 				${this.kpi_card("In-House", d.in_house_count,
 					"Guests currently checked in", "teal",
 					'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>')}
+				${this.kpi_card("Arrivals Today", d.arrivals_today,
+					"Expected check-ins", "amber",
+					'<path d="M19 12H5M12 5l-7 7 7 7"/>')}
+				${this.kpi_card("Departures Today", d.departures_today,
+					"Expected check-outs", "orange",
+					'<path d="M5 12h14M12 5l7 7-7 7"/>')}
 				${this.kpi_card("Tonight's Revenue", format_currency(d.todays_revenue),
 					"Nightly room rates, in-house stays", "green",
 					'<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>')}
-				${this.kpi_card("Arrivals Today", d.arrivals_today,
-					d.departures_today + " departure(s) expected", "amber",
-					'<path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/>')}
 				${this.kpi_card("ADR", format_currency(d.adr),
 					"Average Daily Rate (in-house)", "teal",
 					'<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>')}

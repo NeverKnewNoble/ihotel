@@ -16,6 +16,7 @@
   "contact_details_section",
   "email",
   "city",
+  "address",
   "column_break_kjce",
   "phone_number",
   "state",
@@ -43,11 +44,21 @@
   "column_break_rate3",
   "total_room_revenue",
   "deposit_section",
+  "deposit_percent",
   "deposit_required",
   "deposit_amount",
   "column_break_dep2",
   "deposit_received",
   "deposit_method",
+  "deposit_card_last4",
+  "deposit_card_expiry",
+  "deposit_authorization_code",
+  "deposit_bank_reference",
+  "deposit_cheque_number",
+  "deposit_cheque_bank",
+  "deposit_received_date",
+  "deposit_received_by",
+  "deposit_balance",
   "rooming_list_tab",
   "rooming_list",
   "notes_tab",
@@ -72,9 +83,10 @@
   },
   {
    "fieldname": "group_name",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Group Name",
+   "options": "Guest",
    "reqd": 1
   },
   {
@@ -122,13 +134,19 @@
    "label": "City"
   },
   {
+   "fieldname": "address",
+   "fieldtype": "Small Text",
+   "label": "Address"
+  },
+  {
    "fieldname": "column_break_kjce",
    "fieldtype": "Column Break"
   },
   {
    "fieldname": "phone_number",
-   "fieldtype": "Phone",
-   "label": "Phone Number"
+   "fieldtype": "Data",
+   "label": "Phone Number",
+   "placeholder": "+233 xxx-xxx-xx or 0xxxxxxxx"
   },
   {
    "fieldname": "state",
@@ -242,9 +260,11 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "Auto-filled from the selected Rate Type's Base Rate (or first Rate Schedule row).",
    "fieldname": "rate_per_night",
    "fieldtype": "Currency",
-   "label": "Rate / Night / Room"
+   "label": "Rate per Room Night (excl. tax)",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_rate3",
@@ -262,14 +282,25 @@
    "label": "Deposit"
   },
   {
-   "fieldname": "deposit_required",
-   "fieldtype": "Currency",
-   "label": "Deposit Required"
+   "default": "30",
+   "description": "Percentage of Total Room Revenue required as deposit. Default 30%.",
+   "fieldname": "deposit_percent",
+   "fieldtype": "Percent",
+   "label": "Deposit %"
   },
   {
+   "description": "Auto-calculated: Total Room Revenue \u00d7 Deposit %.",
+   "fieldname": "deposit_required",
+   "fieldtype": "Currency",
+   "label": "Deposit Required",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.deposit_received",
+   "description": "Amount actually paid against the required deposit.",
    "fieldname": "deposit_amount",
    "fieldtype": "Currency",
-   "label": "Deposit Received"
+   "label": "Deposit Received Amount"
   },
   {
    "fieldname": "column_break_dep2",
@@ -278,15 +309,80 @@
   {
    "allow_on_submit": 1,
    "default": "0",
+   "description": "Tick once the deposit has been collected. Payment details below become required.",
    "fieldname": "deposit_received",
    "fieldtype": "Check",
-   "label": "Deposit Confirmed"
+   "label": "Deposit Received"
   },
   {
+   "depends_on": "eval:doc.deposit_received",
    "fieldname": "deposit_method",
    "fieldtype": "Select",
    "label": "Deposit Method",
-   "options": "\nCash\nVisa\nMastercard\nAmex\nBank Transfer\nCity Ledger"
+   "mandatory_depends_on": "eval:doc.deposit_received",
+   "options": "\nCash\nVisa\nMastercard\nAmex\nBank Transfer\nCheque\nCity Ledger"
+  },
+  {
+   "depends_on": "eval:doc.deposit_received && ['Visa','Mastercard','Amex'].includes(doc.deposit_method)",
+   "fieldname": "deposit_card_last4",
+   "fieldtype": "Data",
+   "label": "Card Last 4 Digits",
+   "mandatory_depends_on": "eval:doc.deposit_received && ['Visa','Mastercard','Amex'].includes(doc.deposit_method)"
+  },
+  {
+   "depends_on": "eval:doc.deposit_received && ['Visa','Mastercard','Amex'].includes(doc.deposit_method)",
+   "fieldname": "deposit_card_expiry",
+   "fieldtype": "Data",
+   "label": "Card Expiry (MM/YY)",
+   "mandatory_depends_on": "eval:doc.deposit_received && ['Visa','Mastercard','Amex'].includes(doc.deposit_method)"
+  },
+  {
+   "depends_on": "eval:doc.deposit_received && ['Visa','Mastercard','Amex'].includes(doc.deposit_method)",
+   "fieldname": "deposit_authorization_code",
+   "fieldtype": "Data",
+   "label": "Authorization Code"
+  },
+  {
+   "depends_on": "eval:doc.deposit_received && doc.deposit_method=='Bank Transfer'",
+   "fieldname": "deposit_bank_reference",
+   "fieldtype": "Data",
+   "label": "Bank Transfer Reference",
+   "mandatory_depends_on": "eval:doc.deposit_received && doc.deposit_method=='Bank Transfer'"
+  },
+  {
+   "depends_on": "eval:doc.deposit_received && doc.deposit_method=='Cheque'",
+   "fieldname": "deposit_cheque_number",
+   "fieldtype": "Data",
+   "label": "Cheque Number",
+   "mandatory_depends_on": "eval:doc.deposit_received && doc.deposit_method=='Cheque'"
+  },
+  {
+   "depends_on": "eval:doc.deposit_received && doc.deposit_method=='Cheque'",
+   "fieldname": "deposit_cheque_bank",
+   "fieldtype": "Data",
+   "label": "Cheque Bank"
+  },
+  {
+   "depends_on": "eval:doc.deposit_received",
+   "fieldname": "deposit_received_date",
+   "fieldtype": "Date",
+   "label": "Date Received",
+   "mandatory_depends_on": "eval:doc.deposit_received"
+  },
+  {
+   "depends_on": "eval:doc.deposit_received",
+   "fieldname": "deposit_received_by",
+   "fieldtype": "Link",
+   "label": "Received By",
+   "options": "User"
+  },
+  {
+   "depends_on": "eval:doc.deposit_required",
+   "description": "Deposit Required \u2212 Deposit Received Amount.",
+   "fieldname": "deposit_balance",
+   "fieldtype": "Currency",
+   "label": "Outstanding Deposit",
+   "read_only": 1
   },
   {
    "fieldname": "rooming_list_tab",
@@ -324,6 +420,7 @@
    "label": "Cutoff & Cancellation"
   },
   {
+   "description": "The deadline for the guest to confirm and pick up rooms in this block. Rooms still unassigned in the rooming list after this date are released back to general inventory and become available for individual bookings.",
    "fieldname": "cutoff_date",
    "fieldtype": "Date",
    "label": "Room Block Cutoff Date"
@@ -354,62 +451,62 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-20 09:00:00.000000",
+ "modified": "2026-04-27 21:53:07.983085",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Group Reservation",
  "owner": "Administrator",
  "permissions": [
   {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
    "role": "System Manager",
-   "read": 1,
-   "write": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
+   "read": 1,
    "report": 1,
-   "share": 1,
-   "submit": 1,
-   "cancel": 1,
-   "amend": 1
-  },
-  {
    "role": "General Manager",
-   "read": 1,
-   "write": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
    "create": 1,
-   "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
+   "read": 1,
    "report": 1,
-   "share": 1,
-   "submit": 1,
-   "cancel": 1,
-   "amend": 1
-  },
-  {
    "role": "Front Desk Agent",
-   "read": 1,
-   "write": 1,
-   "create": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "report": 1,
    "share": 1,
    "submit": 1,
-   "cancel": 1,
-   "amend": 1
+   "write": 1
   },
   {
-   "role": "Revenue Manager",
-   "read": 1,
-   "write": 1,
    "export": 1,
-   "report": 1
+   "read": 1,
+   "report": 1,
+   "role": "Revenue Manager",
+   "write": 1
   }
  ],
  "row_format": "Dynamic",

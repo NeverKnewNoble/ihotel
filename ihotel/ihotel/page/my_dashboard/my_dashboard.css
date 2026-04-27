@@ -177,6 +177,9 @@
 .ih-kpi-icon.green { background: var(--ih-green-light); color: var(--ih-green); }
 .ih-kpi-icon.teal { background: var(--ih-teal-light); color: var(--ih-teal); }
 .ih-kpi-icon.amber { background: var(--ih-amber-light); color: var(--ih-amber); }
+.ih-kpi-icon.orange { background: var(--ih-orange-light); color: var(--ih-orange); }
+.ih-kpi-icon.red { background: var(--ih-red-light); color: var(--ih-red); }
+.ih-kpi-icon.purple { background: var(--ih-purple-light); color: var(--ih-purple); }
 
 .ih-kpi-icon svg { stroke: currentColor; fill: none; }
 

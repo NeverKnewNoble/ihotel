@@ -112,7 +112,7 @@ class Guest(Document):
 				# row under Accounting).
 				cust_values = frappe.db.get_value(
 					"Customer", db_customer,
-					["customer_name", "gender", "default_currency", "so_required", "dn_required"],
+					["customer_name", "gender", "default_currency", "so_required", "dn_required", "customer_type"],
 					as_dict=True,
 				) or {}
 
@@ -123,6 +123,10 @@ class Guest(Document):
 					updates["customer_name"] = self.guest_name
 				if self.gender and cust_values.get("gender") != self.gender:
 					updates["gender"] = self.gender
+				# Keep customer_type aligned when the Guest type changes
+				if (self.guest_type in ("Individual", "Company", "Partnership")
+				    and cust_values.get("customer_type") != self.guest_type):
+					updates["customer_type"] = self.guest_type
 				if not cust_values.get("default_currency"):
 					hotel_currency = settings.get("currency")
 					if hotel_currency:
@@ -166,17 +170,23 @@ class Guest(Document):
 					self.db_set("sync_status", "Synced", update_modified=False)
 				return
 
-			# Some sites enforce Customer.mobile_no as mandatory (HR/Employee customizations).
-			# Skip auto-customer creation when guest mobile is empty to avoid blocking guest saves.
-			if not self.phone:
-				return
-
+			# Note: some sites enforce Customer.mobile_no as mandatory (HR/Employee
+			# customizations). On those sites the create call below will fail when
+			# the guest has no phone, but the surrounding try/except records that as
+			# sync_status='Failed' and the user can fix the phone + Retry Sync. On
+			# normal sites the Customer is created with an empty phone — which is
+			# what most sites want.
 			settings = frappe.get_single("iHotel Settings")
+			# Mirror Guest.guest_type onto Customer.customer_type — both doctypes
+			# share the same {Individual, Company, Partnership} option set.
+			customer_type = self.guest_type if self.guest_type in (
+				"Individual", "Company", "Partnership",
+			) else "Individual"
 			customer_payload = {
 				"doctype": "Customer",
 				"customer_name": self.guest_name,
 				"custom_customer_id": self.guest_name,
-				"customer_type": "Individual",
+				"customer_type": customer_type,
 				"customer_group": _resolve_default_customer_group(settings),
 				"territory": settings.get("default_territory") or "All Territories",
 				# Allow front-desk billing: Sales Invoices are posted directly from the
