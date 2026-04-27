@@ -21,6 +21,7 @@ def _ensure_date_unlocked(d, what):
 
 class iHotelProfile(Document):
 	def validate(self):
+
 		self.guard_audited_dates()
 		self.recalculate_amounts()
 		self.update_status()
@@ -77,12 +78,17 @@ class iHotelProfile(Document):
 				_ensure_date_unlocked(old.date, _("the deletion of a payment"))
 
 	def recalculate_amounts(self):
-		"""Sum charges and payments separately; derive outstanding balance."""
+		"""Sum charges and payments separately; derive outstanding balance.
+
+		Payments may be received in any currency; they convert to company
+		currency via each row's exchange_rate (default 1 when not set).
+		"""
 		self.total_amount = round(
 			sum(flt(r.amount) for r in self.get("charges", [])), 2
 		)
 		self.total_payments = round(
-			sum(flt(r.rate) for r in self.get("payments", [])), 2
+			sum(flt(r.rate) * (flt(r.exchange_rate) or 1) for r in self.get("payments", [])),
+			2,
 		)
 		self.outstanding_balance = round(
 			self.total_amount - self.total_payments, 2
@@ -100,6 +106,31 @@ class iHotelProfile(Document):
 			self.status = "Settled"
 		elif self.status == "Settled" and self.outstanding_balance > 0:
 			self.status = "Open"
+
+	def on_update(self):
+		"""Cascade folio-payment sync to ERPXpand GL on every save.
+
+		Delegates to the linked Checked In's _sync_folio_payments_from_profile
+		helper, which iterates `payments` and posts a Payment Entry for each
+		row missing `payment_entry`. Partial payments post immediately — the
+		folio doesn't have to be Settled first. Idempotency (via the
+		`payment_entry` link) prevents duplicates on subsequent saves.
+
+		Failures are logged, never raised — a downstream GL hiccup must not
+		block front desk from editing the folio.
+		"""
+		if not self.hotel_stay:
+			return
+		try:
+			if frappe.db.get_single_value("iHotel Settings", "enable_accounting_integration") != 1:
+				return
+			stay = frappe.get_doc("Checked In", self.hotel_stay)
+			stay._sync_folio_payments_from_profile(self)
+		except Exception as e:
+			frappe.log_error(
+				f"iHotel: folio on_update payment sync failed for profile "
+				f"{self.name}: {e!s}"
+			)
 
 	def on_trash(self):
 		"""Break the back-reference in Checked In before Frappe's link-check runs."""

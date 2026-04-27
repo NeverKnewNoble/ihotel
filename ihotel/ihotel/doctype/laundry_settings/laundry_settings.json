@@ -6,6 +6,7 @@
  "field_order": [
   "default_income_account",
   "default_expense_account",
+  "default_taxes_and_charges",
   "column_break_lset1",
   "default_warehouse",
   "auto_create_sales_invoice",
@@ -33,6 +34,13 @@
    "fieldtype": "Link",
    "label": "Default Expense Account",
    "options": "Account"
+  },
+  {
+   "fieldname": "default_taxes_and_charges",
+   "fieldtype": "Link",
+   "label": "Default Sales Taxes and Charges Template",
+   "options": "Sales Taxes and Charges Template",
+   "description": "Optional. When set, Sales Invoices auto-created from Laundry Orders apply this template so tax is booked per GL account. Leave empty for no tax (legacy behaviour)."
   },
   {
    "fieldname": "column_break_lset1",
