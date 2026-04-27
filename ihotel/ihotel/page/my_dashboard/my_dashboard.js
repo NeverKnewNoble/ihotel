@@ -99,74 +99,9 @@ class IHotelDashboard {
 			</div>
 
 			<!-- Room Status + Operations -->
-			<div class="ih-section-grid">
-				<!-- Room Status -->
-				<div class="ih-card">
-					<div class="ih-card-header">
-						<div class="ih-card-title">Room Status</div>
-						<a class="ih-card-link" href="/app/room">View All Rooms</a>
-					</div>
-					<div class="ih-card-body">
-						<div id="ih-room-chart" class="ih-chart-container"></div>
-						<div class="ih-status-bars" style="margin-top: 16px;">
-							${this.status_bar("Available",      d.room_status.Available,           d.total_rooms, "available")}
-							${this.status_bar("Occupied",       d.room_status.Occupied,            d.total_rooms, "occupied")}
-							${this.status_bar("DND",            d.room_status.DND,                 d.total_rooms, "dnd")}
-							${this.status_bar("Vacant Dirty",   d.room_status["Vacant Dirty"],     d.total_rooms, "vacant-dirty")}
-							${this.status_bar("Occupied Dirty", d.room_status["Occupied Dirty"],   d.total_rooms, "occupied-dirty")}
-							${this.status_bar("Out of Order",   d.room_status["Out of Order"],     d.total_rooms, "out-of-order")}
-						</div>
-					</div>
-				</div>
-
-				<!-- Operations Summary -->
-				<div class="ih-card">
-					<div class="ih-card-header">
-						<div class="ih-card-title">Operations</div>
-					</div>
-					<div class="ih-card-body">
-						<!-- Housekeeping -->
-						<div class="ih-ops-section">
-							<div class="ih-ops-title">
-								<svg viewBox="0 0 24 24" fill="none" stroke="var(--ih-amber)" stroke-width="2"
-									stroke-linecap="round" stroke-linejoin="round">
-									<path d="M9 11l3 3L22 4"/>
-									<path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-								</svg>
-								Housekeeping
-							</div>
-							<div class="ih-ops-items">
-								${this.ops_item("Pending",     d.housekeeping.Pending,        "pending")}
-								${this.ops_item("In Progress", d.housekeeping["In Progress"],  "in-progress")}
-								${this.ops_item("Completed",   d.housekeeping.Completed,       "completed")}
-							</div>
-						</div>
-						<!-- Maintenance -->
-						<div class="ih-ops-section">
-							<div class="ih-ops-title">
-								<svg viewBox="0 0 24 24" fill="none" stroke="var(--ih-red)" stroke-width="2"
-									stroke-linecap="round" stroke-linejoin="round">
-									<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-								</svg>
-								Maintenance
-							</div>
-							<div class="ih-ops-items">
-								${this.ops_item("Open",        d.maintenance.Open,            "open")}
-								${this.ops_item("In Progress", d.maintenance["In Progress"],   "in-progress")}
-								${this.ops_item("Resolved",    d.maintenance.Resolved,         "resolved")}
-								${this.ops_item("Closed",      d.maintenance.Closed,           "closed")}
-							</div>
-							${d.critical_maintenance > 0 ? `
-							<div class="ih-critical">
-								<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-									<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-									<line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-								</svg>
-								<span>${d.critical_maintenance} critical request${d.critical_maintenance !== 1 ? "s" : ""} need attention</span>
-							</div>` : ""}
-						</div>
-					</div>
-				</div>
+			<div class="ih-section-grid ih-ops-grid">
+				${this.render_room_status_panel(d)}
+				${this.render_operations_panel(d)}
 			</div>
 
 			<!-- Active Stays -->
@@ -213,8 +148,8 @@ class IHotelDashboard {
 			}
 		});
 
-		// Render donut chart
-		this.render_room_chart(d);
+		// Donut chart removed — the new Room Status panel uses a stacked
+		// capacity bar as its visualization, so render_room_chart is no longer called.
 	}
 
 	// --- KPI card helper ---
@@ -314,26 +249,312 @@ class IHotelDashboard {
 		</table>`;
 	}
 
-	// --- Room status donut chart ---
-	render_room_chart(d) {
-		const chart_el = document.getElementById("ih-room-chart");
-		if (!chart_el) return;
+	// =========================================================================
+	// Room Status Panel — capacity narrative
+	// One stacked bar shows how the total inventory is allocated.
+	// Below: three operational columns (Sold / Available / Blocked) explaining
+	// WHY each room can or can't take a new guest tonight.
+	// =========================================================================
+	render_room_status_panel(d) {
+		const rs = d.room_status || {};
+		const total = d.total_rooms || 0;
+		const is_today = d.is_today !== false; // default true if backend didn't send the flag
+		const has_audit = !!d.has_audit;
 
-		const rs = d.room_status;
-		const vals = [rs.Available, rs.Occupied, rs.DND, rs["Vacant Dirty"], rs["Occupied Dirty"], rs["Out of Order"]];
-		if (!vals.some(v => v > 0)) {
-			chart_el.innerHTML = '<div class="ih-empty">No room data</div>';
-			return;
+		// Per-status breakdown is only meaningful for today's live state.
+		// For past/future dates we synthesize aggregate buckets from the
+		// hero numbers (which DO come from Night Audit when available).
+		const live = is_today;
+
+		const sold_count      = live
+			? (rs.Occupied || 0) + (rs.DND || 0) + (rs["Occupied Dirty"] || 0)
+			: (d.occupied_rooms || 0);
+		const blocked_count   = live
+			? (rs["Out of Order"] || 0) + (rs["Out of Service"] || 0)
+			: 0;
+		const available_count = Math.max(0, total - sold_count - blocked_count);
+
+		const pct = (n) => total > 0 ? ((n / total) * 100) : 0;
+		const fmt_pct = (n) => pct(n).toFixed(pct(n) < 10 ? 1 : 0) + "%";
+
+		// Stacked capacity bar — full per-status colors when live, simple
+		// 3-bucket bar (sold/available/blocked) when historical/future.
+		let stack_html;
+		if (live) {
+			const segments = [
+				{ key: "Occupied",        cls: "occupied",        count: rs.Occupied        || 0 },
+				{ key: "DND",             cls: "dnd",             count: rs.DND             || 0 },
+				{ key: "Occupied Dirty",  cls: "occupied-dirty",  count: rs["Occupied Dirty"] || 0 },
+				{ key: "Available",       cls: "available",       count: rs.Available       || 0 },
+				{ key: "Vacant Dirty",    cls: "vacant-dirty",    count: rs["Vacant Dirty"] || 0 },
+				{ key: "Out of Order",    cls: "out-of-order",    count: rs["Out of Order"] || 0 },
+				{ key: "Out of Service",  cls: "out-of-service",  count: rs["Out of Service"] || 0 },
+			];
+			stack_html = segments.filter(s => s.count > 0).map(s => `
+				<div class="ih-cap-seg ih-cap-seg--${s.cls}"
+					 style="flex-grow:${s.count};"
+					 title="${s.key}: ${s.count} (${fmt_pct(s.count)})"></div>
+			`).join("");
+		} else {
+			const buckets = [
+				{ key: "Sold",      cls: "occupied",  count: sold_count },
+				{ key: "Available", cls: "available", count: available_count },
+				{ key: "Blocked",   cls: "out-of-order", count: blocked_count },
+			];
+			stack_html = buckets.filter(b => b.count > 0).map(b => `
+				<div class="ih-cap-seg ih-cap-seg--${b.cls}"
+					 style="flex-grow:${b.count};"
+					 title="${b.key}: ${b.count} (${fmt_pct(b.count)})"></div>
+			`).join("");
 		}
 
-		this.chart = new frappe.Chart(chart_el, {
-			data: {
-				labels: ["Available", "Occupied", "DND", "Vacant Dirty", "Occupied Dirty", "Out of Order"],
-				datasets: [{ values: vals }],
-			},
-			type: "donut",
-			height: 220,
-			colors: ["#10b981", "#3b82f6", "#a855f7", "#fb923c", "#f97316", "#ef4444"],
-		});
+		const row = (label, n, dot_cls) => `
+			<div class="ih-rs-row">
+				<span class="ih-rs-dot ih-rs-dot--${dot_cls}"></span>
+				<span class="ih-rs-label">${label}</span>
+				<span class="ih-rs-count">${n}</span>
+			</div>`;
+
+		// Date badge in the header so users always know what view they're seeing
+		const date_user = d.selected_date ? frappe.datetime.str_to_user(d.selected_date) : "";
+		const badge = is_today
+			? `<span class="ih-rs-badge ih-rs-badge--live">Live</span>`
+			: (has_audit
+				? `<span class="ih-rs-badge ih-rs-badge--snap">Snapshot · ${date_user}</span>`
+				: `<span class="ih-rs-badge ih-rs-badge--none">No audit · ${date_user}</span>`);
+
+		// Three-group breakdown only renders for today's live data.
+		// For historical/future, replace with aggregate Sold / Available / Blocked tiles.
+		const groups_html = live ? `
+			<div class="ih-rs-groups">
+				<div class="ih-rs-group">
+					<div class="ih-rs-group-head">
+						<span class="ih-rs-group-name">Sold</span>
+						<span class="ih-rs-group-total">
+							<strong>${sold_count}</strong>
+							<span class="ih-rs-group-pct">${fmt_pct(sold_count)}</span>
+						</span>
+					</div>
+					${row("Occupied",       rs.Occupied          || 0, "occupied")}
+					${row("DND",            rs.DND               || 0, "dnd")}
+					${row("Occupied Dirty", rs["Occupied Dirty"] || 0, "occupied-dirty")}
+				</div>
+				<div class="ih-rs-group">
+					<div class="ih-rs-group-head">
+						<span class="ih-rs-group-name">Available</span>
+						<span class="ih-rs-group-total">
+							<strong>${available_count}</strong>
+							<span class="ih-rs-group-pct">${fmt_pct(available_count)}</span>
+						</span>
+					</div>
+					${row("Available",    rs.Available        || 0, "available")}
+					${row("Vacant Dirty", rs["Vacant Dirty"]  || 0, "vacant-dirty")}
+				</div>
+				<div class="ih-rs-group">
+					<div class="ih-rs-group-head">
+						<span class="ih-rs-group-name">Blocked</span>
+						<span class="ih-rs-group-total">
+							<strong>${blocked_count}</strong>
+							<span class="ih-rs-group-pct">${fmt_pct(blocked_count)}</span>
+						</span>
+					</div>
+					${row("Out of Order",   rs["Out of Order"]   || 0, "out-of-order")}
+					${row("Out of Service", rs["Out of Service"] || 0, "out-of-service")}
+				</div>
+			</div>` : `
+			<div class="ih-rs-groups ih-rs-groups--aggregate">
+				<div class="ih-rs-group">
+					<div class="ih-rs-group-head">
+						<span class="ih-rs-group-name">Sold</span>
+						<span class="ih-rs-group-total"><strong>${sold_count}</strong>
+							<span class="ih-rs-group-pct">${fmt_pct(sold_count)}</span></span>
+					</div>
+				</div>
+				<div class="ih-rs-group">
+					<div class="ih-rs-group-head">
+						<span class="ih-rs-group-name">Available</span>
+						<span class="ih-rs-group-total"><strong>${available_count}</strong>
+							<span class="ih-rs-group-pct">${fmt_pct(available_count)}</span></span>
+					</div>
+				</div>
+				<div class="ih-rs-group">
+					<div class="ih-rs-group-head">
+						<span class="ih-rs-group-name">Blocked</span>
+						<span class="ih-rs-group-total"><strong>${blocked_count}</strong>
+							<span class="ih-rs-group-pct">${fmt_pct(blocked_count)}</span></span>
+					</div>
+				</div>
+			</div>
+			<div class="ih-rs-note">
+				${has_audit
+					? "Per-status breakdown isn't snapshotted on Night Audit — showing aggregates from the audit."
+					: "No Night Audit was submitted for this date — historical room state isn't available."}
+			</div>`;
+
+		return `
+		<div class="ih-card ih-room-card">
+			<div class="ih-card-header">
+				<div class="ih-card-title">Room Status ${badge}</div>
+				<a class="ih-card-link" href="/app/room">View All Rooms</a>
+			</div>
+			<div class="ih-card-body">
+				<div class="ih-rs-hero">
+					<div class="ih-rs-hero-figure">
+						<span class="ih-rs-hero-num">${sold_count}</span>
+						<span class="ih-rs-hero-divider">/</span>
+						<span class="ih-rs-hero-total">${total}</span>
+					</div>
+					<div class="ih-rs-hero-meta">
+						<span class="ih-rs-hero-label">${is_today ? "Occupied now" : "Occupied"}</span>
+						<span class="ih-rs-hero-pct">${(d.occupancy_rate || 0).toFixed(1)}%</span>
+					</div>
+				</div>
+
+				<div class="ih-cap-bar" role="img" aria-label="Room status distribution">
+					${stack_html || `<div class="ih-cap-seg ih-cap-seg--out-of-service" style="flex-grow:1;" title="No data"></div>`}
+				</div>
+
+				${groups_html}
+			</div>
+		</div>`;
+	}
+
+	// =========================================================================
+	// Operations Panel — action-first ops view
+	// Surfaces dimensions the doctype actually has: priority, assignment,
+	// task type, category — not just status counts.
+	// =========================================================================
+	render_operations_panel(d) {
+		const hk = d.housekeeping || {};
+		const mt = d.maintenance  || {};
+
+		// Backwards-compat: old payload was a flat {Pending, In Progress, Completed} dict
+		const hk_status = hk.status || (typeof hk.Pending === "number" ? hk : {});
+		const mt_status = mt.status || (typeof mt.Open    === "number" ? mt : {});
+
+		const hk_total  = hk.total != null ? hk.total : Object.values(hk_status).reduce((a,b) => a+b, 0);
+		const mt_total  = mt.total != null ? mt.total : Object.values(mt_status).reduce((a,b) => a+b, 0);
+
+		const hk_urgent     = hk.urgent     || 0;
+		const hk_high       = hk.high       || 0;
+		const hk_unassigned = hk.unassigned || 0;
+		const hk_due_today  = hk.due_today  || 0;
+
+		const mt_critical   = mt.critical   || (d.critical_maintenance || 0);
+		const mt_high       = mt.high       || 0;
+		const mt_unassigned = mt.unassigned || 0;
+		const mt_open_today = mt.open_today || ((mt_status["Open"] || 0) + (mt_status["In Progress"] || 0));
+
+		const action_total  = hk_unassigned + mt_unassigned;
+		const action_pulse  = (hk_urgent + mt_critical + action_total) > 0;
+
+		const status_row = (label, n, max, cls) => {
+			const w = max > 0 ? Math.max(2, (n / max) * 100) : 0;
+			return `
+			<div class="ih-op-row">
+				<span class="ih-op-row-label">${label}</span>
+				<div class="ih-op-row-bar"><div class="ih-op-row-bar-fill ih-op-row-bar-fill--${cls}" style="width:${w}%"></div></div>
+				<span class="ih-op-row-count">${n}</span>
+			</div>`;
+		};
+
+		const by_type   = hk.by_type || {};
+		const type_max  = Math.max(1, ...Object.values(by_type));
+		const type_rows = Object.entries(by_type)
+			.sort((a,b) => b[1] - a[1])
+			.map(([name, n]) => `
+				<div class="ih-op-tt-row">
+					<span class="ih-op-tt-name">${frappe.utils.escape_html(name)}</span>
+					<div class="ih-op-tt-bar"><div class="ih-op-tt-bar-fill" style="width:${(n/type_max)*100}%"></div></div>
+					<span class="ih-op-tt-count">${n}</span>
+				</div>`).join("");
+
+		const by_cat = mt.by_category || [];
+		const cat_html = by_cat.length ? `
+			<div class="ih-op-chips">
+				${by_cat.slice(0, 6).map(c => `
+					<a class="ih-op-chip" href="/app/maintenance-request?category=${encodeURIComponent(c.category)}">
+						<span class="ih-op-chip-name">${frappe.utils.escape_html(c.category)}</span>
+						<span class="ih-op-chip-count">${c.count}</span>
+					</a>`).join("")}
+			</div>` : `<div class="ih-op-empty">No active categories</div>`;
+
+		const action_tile = (kind, count, label, sub, href) => `
+			<a class="ih-action-tile ih-action-tile--${kind} ${count > 0 ? 'is-live' : 'is-quiet'}" href="${href}">
+				<span class="ih-action-num">${count}</span>
+				<span class="ih-action-label">${label}</span>
+				<span class="ih-action-sub">${sub}</span>
+			</a>`;
+
+		const ic_alert  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+		const ic_broom  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.4 15L18 14.6 16 19l1.4.4a2 2 0 0 0 2.5-1.4l.4-1.4a2 2 0 0 0-1.4-2.5z"/><path d="M16 19l-3-1-2 4 4-1z"/><path d="M3 21l9-9"/><path d="M14 4l6 6"/></svg>';
+		const ic_wrench = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>';
+
+		const alert_msgs = [];
+		if (mt_critical > 0)   alert_msgs.push(`${mt_critical} critical maintenance request${mt_critical !== 1 ? 's' : ''}`);
+		if (hk_urgent > 0)     alert_msgs.push(`${hk_urgent} urgent housekeeping task${hk_urgent !== 1 ? 's' : ''}`);
+		if (action_total > 0)  alert_msgs.push(`${action_total} unassigned`);
+		const alert_html = alert_msgs.length ? `
+			<div class="ih-op-alert">
+				<span class="ih-op-alert-icon">${ic_alert}</span>
+				<span>${alert_msgs.join(' · ')} need attention</span>
+			</div>` : "";
+
+		const date_user = d.selected_date ? frappe.datetime.str_to_user(d.selected_date) : "";
+		const date_label = (d.is_today === false) ? date_user : "today";
+
+		return `
+		<div class="ih-card ih-ops-card">
+			<div class="ih-card-header">
+				<div class="ih-card-title">Operations <span class="ih-rs-badge ih-rs-badge--snap">${date_label}</span></div>
+			</div>
+			<div class="ih-card-body">
+				<div class="ih-op-section">
+					<div class="ih-op-section-head">
+						<div class="ih-op-section-title">
+							<span class="ih-op-section-ic ih-op-section-ic--hk">${ic_broom}</span>
+							Housekeeping
+						</div>
+						<div class="ih-op-section-meta">
+							<span><strong>${hk_total}</strong> task${hk_total !== 1 ? 's' : ''}</span>
+							<span class="ih-op-meta-pill">${hk_due_today} scheduled</span>
+						</div>
+					</div>
+					<div class="ih-op-rows">
+						${status_row('In Progress', hk_status['In Progress'] || 0, hk_total, 'in-progress')}
+						${status_row('Completed',   hk_status['Completed']   || 0, hk_total, 'completed')}
+					</div>
+					<div class="ih-op-tt">
+						<div class="ih-op-tt-head">By Task Type</div>
+						${type_rows || `<div class="ih-op-empty">No tasks today</div>`}
+					</div>
+				</div>
+
+				<div class="ih-op-section">
+					<div class="ih-op-section-head">
+						<div class="ih-op-section-title">
+							<span class="ih-op-section-ic ih-op-section-ic--mt">${ic_wrench}</span>
+							Maintenance
+						</div>
+						<div class="ih-op-section-meta">
+							<span><strong>${mt_total}</strong> request${mt_total !== 1 ? 's' : ''}</span>
+							<span class="ih-op-meta-pill ih-op-meta-pill--warn">${mt_open_today} open</span>
+						</div>
+					</div>
+					<div class="ih-op-rows">
+						${status_row('Open',        mt_status['Open']        || 0, mt_total, 'open')}
+						${status_row('In Progress', mt_status['In Progress'] || 0, mt_total, 'in-progress')}
+						${status_row('Resolved',    mt_status['Resolved']    || 0, mt_total, 'resolved')}
+						${status_row('Closed',      mt_status['Closed']      || 0, mt_total, 'closed')}
+					</div>
+					<div class="ih-op-cats">
+						<div class="ih-op-cats-head">Top Categories</div>
+						${cat_html}
+					</div>
+				</div>
+
+				${alert_html}
+			</div>
+		</div>`;
 	}
 }
