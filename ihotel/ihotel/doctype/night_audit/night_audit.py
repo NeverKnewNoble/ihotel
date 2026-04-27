@@ -8,9 +8,26 @@
 import frappe
 from frappe.model.document import Document
 from frappe import _
-from frappe.utils import getdate, flt
+from frappe.utils import getdate, flt, now_datetime
 
 from ihotel.ihotel.doctype.charge_type.charge_type import resolve_hotel_account_for_charge_type
+
+
+# Roles allowed to tick the "verified" box on Night Audit charges/payments
+VERIFIER_ROLES = {"Night Auditor", "System Manager", "Administrator"}
+
+
+def is_audit_date_locked(d):
+    """Return True when a submitted Night Audit exists for the given date.
+
+    Used by iHotel Profile to block back-dated postings on closed days.
+    """
+    if not d:
+        return False
+    return bool(frappe.db.exists(
+        "Night Audit",
+        {"audit_date": getdate(d), "docstatus": 1},
+    ))
 
 
 def get_stays_in_house_on(audit_date):
@@ -48,6 +65,192 @@ class NightAudit(Document):
             self.performed_by = frappe.session.user
         self.validate_audit_date()
         self.calculate_audit_metrics()
+        # Snapshot the day's folio charges & payments on the very first save
+        # so the user sees them right away — no need to click "Reload" first.
+        self._reload_if_empty()
+        self._guard_verification_role()
+        self._stamp_verified_metadata()
+        self._recalc_verification_summary()
+
+    def before_submit(self):
+        """Final gate before submitting: tabs must be loaded, every row verified,
+        and no new charges/payments can have appeared since the snapshot."""
+        self._reload_if_empty()
+        self._check_for_new_transactions()
+        self._validate_all_verified()
+
+    def _reload_if_empty(self):
+        """If the user opened a fresh audit and never clicked Reload, fetch now."""
+        if not self.charges and not self.payments:
+            self._load_day_transactions()
+
+    def _load_day_transactions(self):
+        """Snapshot every Folio Charge / Payment Items row with date == audit_date.
+        Preserves existing verified flags by matching on source_row."""
+        d = getdate(self.audit_date) if self.audit_date else None
+        if not d:
+            return
+
+        # Preserve verifications across reloads
+        prev_charges = {c.source_row: c for c in (self.charges or []) if c.source_row}
+        prev_payments = {p.source_row: p for p in (self.payments or []) if p.source_row}
+
+        charges = frappe.db.sql(
+            """
+            SELECT fc.name AS source_row, fc.charge_date, fc.parent AS profile,
+                   fc.charge_type, fc.description, fc.quantity, fc.rate, fc.amount,
+                   p.room AS room, p.guest AS guest
+            FROM `tabFolio Charge` fc
+            INNER JOIN `tabiHotel Profile` p ON p.name = fc.parent
+            WHERE fc.charge_date = %(d)s
+              AND fc.parenttype = 'iHotel Profile'
+            ORDER BY p.name, fc.idx
+            """,
+            {"d": d},
+            as_dict=True,
+        )
+        payments = frappe.db.sql(
+            """
+            SELECT pi.name AS source_row, pi.date, pi.parent AS profile,
+                   pi.payment_method, pi.detail, pi.rate, pi.payment_status,
+                   p.room AS room, p.guest AS guest
+            FROM `tabPayment Items` pi
+            INNER JOIN `tabiHotel Profile` p ON p.name = pi.parent
+            WHERE pi.date = %(d)s
+              AND pi.parenttype = 'iHotel Profile'
+            ORDER BY p.name, pi.idx
+            """,
+            {"d": d},
+            as_dict=True,
+        )
+
+        self.set("charges", [])
+        for c in charges:
+            row = {
+                "charge_date": c.charge_date,
+                "profile": c.profile,
+                "room": c.room,
+                "guest": c.guest,
+                "charge_type": c.charge_type,
+                "description": c.description,
+                "quantity": c.quantity,
+                "rate": c.rate,
+                "amount": c.amount,
+                "source_row": c.source_row,
+            }
+            prev = prev_charges.get(c.source_row)
+            if prev and prev.verified:
+                row["verified"] = 1
+                row["verified_by"] = prev.verified_by
+                row["verified_on"] = prev.verified_on
+            self.append("charges", row)
+
+        self.set("payments", [])
+        for p in payments:
+            row = {
+                "date": p.date,
+                "profile": p.profile,
+                "room": p.room,
+                "guest": p.guest,
+                "payment_method": p.payment_method,
+                "detail": p.detail,
+                "rate": p.rate,
+                "payment_status": p.payment_status,
+                "source_row": p.source_row,
+            }
+            prev = prev_payments.get(p.source_row)
+            if prev and prev.verified:
+                row["verified"] = 1
+                row["verified_by"] = prev.verified_by
+                row["verified_on"] = prev.verified_on
+            self.append("payments", row)
+
+        self.transactions_loaded_on = now_datetime()
+        self._recalc_verification_summary()
+
+    def _check_for_new_transactions(self):
+        """If any folio row exists for audit_date that isn't snapshotted yet, refuse."""
+        d = getdate(self.audit_date) if self.audit_date else None
+        if not d:
+            return
+        snapshot_charges = {c.source_row for c in (self.charges or []) if c.source_row}
+        snapshot_payments = {p.source_row for p in (self.payments or []) if p.source_row}
+
+        live_charges = {r[0] for r in frappe.db.sql(
+            "SELECT name FROM `tabFolio Charge` WHERE charge_date = %s", (d,),
+        )}
+        live_payments = {r[0] for r in frappe.db.sql(
+            "SELECT name FROM `tabPayment Items` WHERE date = %s", (d,),
+        )}
+
+        new_charges = live_charges - snapshot_charges
+        new_payments = live_payments - snapshot_payments
+        if new_charges or new_payments:
+            frappe.throw(_(
+                "New transactions have been posted since the audit was loaded "
+                "({0} charges, {1} payments). Click 'Reload Transactions' and verify them before submitting."
+            ).format(len(new_charges), len(new_payments)))
+
+    def _validate_all_verified(self):
+        """Refuse submit if any charge or payment row is not verified."""
+        bad_charges = [c for c in (self.charges or []) if not c.verified]
+        bad_payments = [p for p in (self.payments or []) if not p.verified]
+        if bad_charges or bad_payments:
+            parts = []
+            if bad_charges:
+                parts.append(_("{0} charge(s) unverified").format(len(bad_charges)))
+            if bad_payments:
+                parts.append(_("{0} payment(s) unverified").format(len(bad_payments)))
+            frappe.throw(_(
+                "All charges and payments must be verified before submitting the night audit. {0}."
+            ).format(", ".join(parts)))
+
+    def _stamp_verified_metadata(self):
+        """When a row is checked but verified_by is empty, stamp the current user/now."""
+        user = frappe.session.user
+        ts = now_datetime()
+        for row in (self.charges or []) + (self.payments or []):
+            if row.verified and not row.verified_by:
+                row.verified_by = user
+                row.verified_on = ts
+            elif not row.verified:
+                row.verified_by = None
+                row.verified_on = None
+
+    def _guard_verification_role(self):
+        """Block users without the Night Auditor role from setting verified=1.
+
+        Compares against the saved DB state to identify newly-checked rows.
+        """
+        if self.is_new():
+            # First save can't have any "newly checked" rows from a prior state
+            return
+        roles = set(frappe.get_roles(frappe.session.user))
+        if roles & VERIFIER_ROLES:
+            return
+
+        prev = frappe.get_doc("Night Audit", self.name)
+        prev_charges = {c.source_row: c.verified for c in prev.get("charges", [])}
+        prev_payments = {p.source_row: p.verified for p in prev.get("payments", [])}
+
+        def newly_checked(rows, prev_map):
+            return any(
+                r.verified and not prev_map.get(r.source_row)
+                for r in rows
+            )
+
+        if newly_checked(self.charges or [], prev_charges) or newly_checked(self.payments or [], prev_payments):
+            frappe.throw(_(
+                "Only users with the 'Night Auditor' role can verify charges or payments."
+            ), frappe.PermissionError)
+
+    def _recalc_verification_summary(self):
+        c_total = len(self.charges or [])
+        c_done = sum(1 for c in (self.charges or []) if c.verified)
+        p_total = len(self.payments or [])
+        p_done = sum(1 for p in (self.payments or []) if p.verified)
+        self.charges_summary = f"{c_done} / {c_total}"
+        self.payments_summary = f"{p_done} / {p_total}"
 
     def calculate_audit_metrics(self):
         """
@@ -161,17 +364,21 @@ class NightAudit(Document):
                     stay_doc.room
                     and stay_doc.status == "Checked In"
                     and getdate(audit_date) == today
+                    and frappe.db.get_value("Room", stay_doc.room, "status") == "Occupied"
                 ):
                     frappe.db.set_value("Room", stay_doc.room, "status", "Occupied Dirty")
                 continue
 
             profile_doc = self.ensure_profile_for_stay(stay_doc)
             self.add_payment_entry(profile_doc, stay_doc)
-            # Housekeeping: only for today's audit and still in-house (skip backfill / checked-out)
+            # Housekeeping: only for today's audit and still in-house (skip backfill / checked-out).
+            # Only flip rooms that are actually "Occupied" — leave "DND" and any other operational
+            # status (e.g. already "Occupied Dirty") untouched.
             if (
                 stay_doc.room
                 and stay_doc.status == "Checked In"
                 and getdate(audit_date) == today
+                and frappe.db.get_value("Room", stay_doc.room, "status") == "Occupied"
             ):
                 frappe.db.set_value("Room", stay_doc.room, "status", "Occupied Dirty")
 
@@ -767,3 +974,46 @@ def _get_pos_direct_payments(audit_date):
         """, {"date": audit_date}, as_dict=True)
 
     return rows
+
+
+@frappe.whitelist()
+def load_day_transactions(name):
+    """Whitelisted: snapshot folio charges/payments for the audit's date into the doc."""
+    doc = frappe.get_doc("Night Audit", name)
+    if doc.docstatus != 0:
+        frappe.throw(_("Cannot reload transactions on a submitted or cancelled audit."))
+    doc._load_day_transactions()
+    doc.save(ignore_permissions=False)
+    return {
+        "charges_count": len(doc.charges or []),
+        "payments_count": len(doc.payments or []),
+    }
+
+
+@frappe.whitelist()
+def verify_all(name):
+    """Whitelisted: mark every loaded charge and payment as verified by the current user.
+
+    Restricted to users with one of the VERIFIER_ROLES.
+    """
+    roles = set(frappe.get_roles(frappe.session.user))
+    if not (roles & VERIFIER_ROLES):
+        frappe.throw(
+            _("Only users with the 'Night Auditor' role can verify charges or payments."),
+            frappe.PermissionError,
+        )
+    doc = frappe.get_doc("Night Audit", name)
+    if doc.docstatus != 0:
+        frappe.throw(_("Cannot verify rows on a submitted or cancelled audit."))
+    user = frappe.session.user
+    ts = now_datetime()
+    for row in (doc.charges or []) + (doc.payments or []):
+        if not row.verified:
+            row.verified = 1
+            row.verified_by = user
+            row.verified_on = ts
+    doc.save(ignore_permissions=False)
+    return {
+        "verified_charges": len(doc.charges or []),
+        "verified_payments": len(doc.payments or []),
+    }

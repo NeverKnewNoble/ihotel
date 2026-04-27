@@ -204,6 +204,7 @@
 .rb-pill.active[data-status="Occupied Dirty"] { background: #f97316; }
 .rb-pill.active[data-status="Out of Order"]   { background: #ef4444; }
 .rb-pill.active[data-status="Out of Service"] { background: #6b7280; }
+.rb-pill.active[data-status="DND"]            { background: #a855f7; }
 
 /* ── Showing count ── */
 .rb-showing-count {

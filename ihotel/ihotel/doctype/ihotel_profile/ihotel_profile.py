@@ -2,16 +2,79 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt, nowdate
+from frappe.utils import flt, nowdate, getdate
 
 from ihotel.ihotel.doctype.charge_type.charge_type import ensure_default_charge_types
+from ihotel.ihotel.doctype.night_audit.night_audit import is_audit_date_locked
+
+
+def _ensure_date_unlocked(d, what):
+	"""Throw if a submitted Night Audit exists for the given date."""
+	if is_audit_date_locked(d):
+		frappe.throw(
+			_("Cannot post {0} on {1}: a Night Audit has already been submitted for that day.")
+				.format(what, getdate(d))
+		)
 
 
 class iHotelProfile(Document):
 	def validate(self):
+		self.guard_audited_dates()
 		self.recalculate_amounts()
 		self.update_status()
+
+	def guard_audited_dates(self):
+		"""Block any add/edit/delete of charges or payments on dates already audited.
+
+		Compares against the saved DB state to catch all three cases (insert, update, delete).
+		"""
+		if self.is_new():
+			# A new profile has no audited rows yet
+			for c in self.get("charges", []):
+				_ensure_date_unlocked(c.charge_date, _("a charge"))
+			for p in self.get("payments", []):
+				_ensure_date_unlocked(p.date, _("a payment"))
+			return
+
+		prev = frappe.get_doc("iHotel Profile", self.name)
+		prev_charges = {c.name: c for c in prev.get("charges", [])}
+		prev_payments = {p.name: p for p in prev.get("payments", [])}
+
+		# Inserts and edits
+		for c in self.get("charges", []):
+			old = prev_charges.get(c.name)
+			if old is None:
+				_ensure_date_unlocked(c.charge_date, _("a charge"))
+			elif (str(getdate(old.charge_date)) != str(getdate(c.charge_date))
+			      or flt(old.rate) != flt(c.rate)
+			      or flt(old.quantity or 1) != flt(c.quantity or 1)
+			      or flt(old.amount) != flt(c.amount)):
+				# Either the row's old date or its new date being locked is enough to block
+				_ensure_date_unlocked(old.charge_date, _("an edit to a charge"))
+				_ensure_date_unlocked(c.charge_date, _("an edit to a charge"))
+
+		for p in self.get("payments", []):
+			old = prev_payments.get(p.name)
+			if old is None:
+				_ensure_date_unlocked(p.date, _("a payment"))
+			elif (str(getdate(old.date)) != str(getdate(p.date))
+			      or flt(old.rate) != flt(p.rate)
+			      or (old.payment_method or "") != (p.payment_method or "")):
+				_ensure_date_unlocked(old.date, _("an edit to a payment"))
+				_ensure_date_unlocked(p.date, _("an edit to a payment"))
+
+		# Deletes
+		current_charge_names = {c.name for c in self.get("charges", []) if c.name}
+		for old_name, old in prev_charges.items():
+			if old_name not in current_charge_names:
+				_ensure_date_unlocked(old.charge_date, _("the deletion of a charge"))
+
+		current_payment_names = {p.name for p in self.get("payments", []) if p.name}
+		for old_name, old in prev_payments.items():
+			if old_name not in current_payment_names:
+				_ensure_date_unlocked(old.date, _("the deletion of a payment"))
 
 	def recalculate_amounts(self):
 		"""Sum charges and payments separately; derive outstanding balance."""
@@ -55,6 +118,7 @@ class iHotelProfile(Document):
 		(e.g. the check-in date or an audit date) to back/forward-date a charge.
 		"""
 		ensure_default_charge_types()
+		_ensure_date_unlocked(charge_date or nowdate(), _("a charge"))
 		self.append("charges", {
 			"charge_date": charge_date or nowdate(),
 			"charge_type": charge_type,
@@ -86,6 +150,12 @@ def transfer_folio(source_profile_name, target_profile_name):
 		frappe.throw(_("Only Open folios can be transferred."))
 	if target.status not in ("Open",):
 		frappe.throw(_("Target folio must be Open."))
+
+	# Refuse the transfer up front if any line being moved sits on an audited day
+	for c in source.get("charges", []):
+		_ensure_date_unlocked(c.charge_date, _("a folio transfer (charge dated)"))
+	for p in source.get("payments", []):
+		_ensure_date_unlocked(p.date, _("a folio transfer (payment dated)"))
 
 	source_label = _("Room {0}").format(source.room or source_profile_name)
 

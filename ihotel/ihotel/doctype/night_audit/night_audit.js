@@ -20,14 +20,15 @@ frappe.ui.form.on("Night Audit", {
 			});
 		}
 
-		// Trial Balance button
+		// Trial Balance button — navigates to the Trial Balance page pre-filled
+		// with the audit date as a single-day range.
 		if (!frm.is_new() && frm.doc.audit_date) {
 			frm.add_custom_button(__("Trial Balance"), function() {
-				frm.call("get_trial_balance").then(r => {
-					if (r.message) {
-						print_trial_balance(r.message);
-					}
-				});
+				frappe.route_options = {
+					from_date: frm.doc.audit_date,
+					to_date: frm.doc.audit_date,
+				};
+				frappe.set_route("trial_balance");
 			}).addClass("btn-primary");
 		}
 
@@ -46,6 +47,68 @@ frappe.ui.form.on("Night Audit", {
 				}
 			});
 		}).addClass("btn-primary");
+
+		// Reload Transactions / Verify All buttons (only for unsubmitted audits)
+		if (!frm.is_new() && frm.doc.docstatus === 0) {
+			frm.add_custom_button(__("Reload Transactions"), function() {
+				frappe.call({
+					method: "ihotel.ihotel.doctype.night_audit.night_audit.load_day_transactions",
+					args: { name: frm.doc.name },
+					freeze: true,
+					freeze_message: __("Loading transactions for {0}...", [frm.doc.audit_date]),
+					callback: (r) => {
+						if (r.message) {
+							frappe.show_alert({
+								message: __("Loaded {0} charges and {1} payments",
+									[r.message.charges_count, r.message.payments_count]),
+								indicator: "green",
+							});
+							frm.reload_doc();
+						}
+					},
+				});
+			});
+
+			const is_verifier = (frappe.user_roles || []).some(
+				r => ["Night Auditor", "System Manager", "Administrator"].includes(r)
+			);
+			if (is_verifier) {
+				frm.add_custom_button(__("Verify All"), function() {
+					frappe.confirm(
+						__("Mark every charge and payment as verified?"),
+						() => {
+							frappe.call({
+								method: "ihotel.ihotel.doctype.night_audit.night_audit.verify_all",
+								args: { name: frm.doc.name },
+								callback: (r) => {
+									if (r.message) {
+										frappe.show_alert({
+											message: __("Verified {0} charges, {1} payments",
+												[r.message.verified_charges, r.message.verified_payments]),
+											indicator: "green",
+										});
+										frm.reload_doc();
+									}
+								},
+							});
+						}
+					);
+				});
+			}
+		}
+
+		// Hide the verified column from non-verifier users (they can still read but not edit).
+		const verifier = (frappe.user_roles || []).some(
+			r => ["Night Auditor", "System Manager", "Administrator"].includes(r)
+		);
+		if (!verifier) {
+			["charges", "payments"].forEach((tbl) => {
+				const grid = frm.fields_dict[tbl] && frm.fields_dict[tbl].grid;
+				if (grid) {
+					grid.update_docfield_property("verified", "read_only", 1);
+				}
+			});
+		}
 	},
 
 	audit_date(frm) {
@@ -59,6 +122,15 @@ frappe.ui.form.on("Night Audit", {
 					frm.set_value("total_revenue", r.message.total_revenue);
 				}
 			});
+
+			// Auto-snapshot folio transactions for the new date once the doc has a name
+			if (!frm.is_new() && frm.doc.docstatus === 0) {
+				frappe.call({
+					method: "ihotel.ihotel.doctype.night_audit.night_audit.load_day_transactions",
+					args: { name: frm.doc.name },
+					callback: () => frm.reload_doc(),
+				});
+			}
 		}
 	}
 });

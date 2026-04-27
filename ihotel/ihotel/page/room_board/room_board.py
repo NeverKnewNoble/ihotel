@@ -32,7 +32,7 @@ def get_room_board_data():
 		room["make_up_room"] = 0
 		room["rack_rate"] = rack_rates.get(room["room_type"], 0)
 
-		if room["status"] in ("Occupied", "Reserved"):
+		if room["status"] in ("Occupied", "Occupied Dirty", "DND", "Reserved"):
 			stay = frappe.db.get_value(
 				"Checked In",
 				filters={

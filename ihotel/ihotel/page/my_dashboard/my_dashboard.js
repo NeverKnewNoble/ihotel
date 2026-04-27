@@ -29,13 +29,14 @@ class IHotelDashboard {
 		this.page = page;
 		this.container = page.main.find(".ihotel-dash");
 		this.chart = null;
+		this.selected_date = frappe.datetime.nowdate();
 		this.refresh();
 	}
 
 	refresh() {
 		frappe.call({
 			method: "ihotel.ihotel.page.my_dashboard.my_dashboard.get_dashboard_data",
-			args: {},
+			args: { selected_date: this.selected_date },
 			callback: (r) => {
 				if (r.message) {
 					this.data = r.message;
@@ -50,14 +51,17 @@ class IHotelDashboard {
 
 	render() {
 		const d = this.data;
-		const today = frappe.datetime.str_to_user(frappe.datetime.nowdate());
+		const today_iso = frappe.datetime.nowdate();
 
 		this.container.html(`
 			<!-- Header -->
 			<div class="ih-header">
 				<div class="ih-header-left">
 					<h2>${frappe.utils.escape_html(d.hotel_name)}</h2>
-					<div class="ih-date">${today}</div>
+					<div class="ih-date">
+						<input type="date" class="ih-date-input"
+							value="${this.selected_date}" max="${today_iso}" />
+					</div>
 				</div>
 				<button class="ih-refresh-btn" data-action="refresh">
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -104,6 +108,7 @@ class IHotelDashboard {
 						<div class="ih-status-bars" style="margin-top: 16px;">
 							${this.status_bar("Available",      d.room_status.Available,           d.total_rooms, "available")}
 							${this.status_bar("Occupied",       d.room_status.Occupied,            d.total_rooms, "occupied")}
+							${this.status_bar("DND",            d.room_status.DND,                 d.total_rooms, "dnd")}
 							${this.status_bar("Vacant Dirty",   d.room_status["Vacant Dirty"],     d.total_rooms, "vacant-dirty")}
 							${this.status_bar("Occupied Dirty", d.room_status["Occupied Dirty"],   d.total_rooms, "occupied-dirty")}
 							${this.status_bar("Out of Order",   d.room_status["Out of Order"],     d.total_rooms, "out-of-order")}
@@ -194,6 +199,15 @@ class IHotelDashboard {
 			btn.addClass("spinning");
 			this.refresh();
 			setTimeout(() => btn.removeClass("spinning"), 800);
+		});
+
+		// Bind date selector
+		this.container.find('.ih-date-input').on("change", (e) => {
+			const val = e.target.value;
+			if (val) {
+				this.selected_date = val;
+				this.refresh();
+			}
 		});
 
 		// Render donut chart
@@ -303,7 +317,7 @@ class IHotelDashboard {
 		if (!chart_el) return;
 
 		const rs = d.room_status;
-		const vals = [rs.Available, rs.Occupied, rs["Vacant Dirty"], rs["Occupied Dirty"], rs["Out of Order"]];
+		const vals = [rs.Available, rs.Occupied, rs.DND, rs["Vacant Dirty"], rs["Occupied Dirty"], rs["Out of Order"]];
 		if (!vals.some(v => v > 0)) {
 			chart_el.innerHTML = '<div class="ih-empty">No room data</div>';
 			return;
@@ -311,12 +325,12 @@ class IHotelDashboard {
 
 		this.chart = new frappe.Chart(chart_el, {
 			data: {
-				labels: ["Available", "Occupied", "Vacant Dirty", "Occupied Dirty", "Out of Order"],
+				labels: ["Available", "Occupied", "DND", "Vacant Dirty", "Occupied Dirty", "Out of Order"],
 				datasets: [{ values: vals }],
 			},
 			type: "donut",
 			height: 220,
-			colors: ["#10b981", "#3b82f6", "#fb923c", "#f97316", "#ef4444"],
+			colors: ["#10b981", "#3b82f6", "#a855f7", "#fb923c", "#f97316", "#ef4444"],
 		});
 	}
 }

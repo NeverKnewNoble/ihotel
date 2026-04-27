@@ -89,6 +89,10 @@ frappe.pages["room_board"].on_page_load = function (wrapper) {
 							<span class="rb-dot" style="background:#6b7280;"></span>
 							OOS <span class="rb-pill-count">0</span>
 						</button>
+						<button class="rb-pill" data-status="DND">
+							<span class="rb-dot" style="background:#a855f7;"></span>
+							DND <span class="rb-pill-count">0</span>
+						</button>
 					</div>
 					<div class="rb-showing-count"></div>
 				</div>
@@ -110,6 +114,7 @@ frappe.pages["room_board"].on_page_load = function (wrapper) {
 					<div class="rb-legend-item"><span class="rb-dot" style="background:#f97316;"></span><span><b>Occupied Dirty</b> — Occupied, needs overnight cleaning</span></div>
 					<div class="rb-legend-item"><span class="rb-dot" style="background:#ef4444;"></span><span><b>Out of Order</b> — Cannot be sold (maintenance)</span></div>
 					<div class="rb-legend-item"><span class="rb-dot" style="background:#6b7280;"></span><span><b>Out of Service</b> — Temporarily removed from inventory</span></div>
+						<div class="rb-legend-item"><span class="rb-dot" style="background:#a855f7;"></span><span><b>DND</b> — Occupied, do not disturb</span></div>
 				</div>
 			</div>
 
@@ -272,6 +277,7 @@ class RoomBoard {
 			"Occupied Dirty": "#f97316",
 			"Out of Order":   "#ef4444",
 			"Out of Service": "#6b7280",
+			"DND":            "#a855f7",
 		};
 
 		const cards = rooms.map(room => {

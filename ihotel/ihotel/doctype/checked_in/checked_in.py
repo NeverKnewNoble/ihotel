@@ -548,7 +548,7 @@ class CheckedIn(Document):
 
         # Block rooms that are physically unavailable for a new stay.
         # Vacant Dirty is intentionally allowed — the room is free, housekeeping will clean before guest goes up.
-        UNAVAILABLE = ("Out of Order", "Out of Service", "Occupied", "Occupied Dirty")
+        UNAVAILABLE = ("Out of Order", "Out of Service", "Occupied", "Occupied Dirty", "DND")
         if room_status in UNAVAILABLE:
             frappe.throw(
                 _("Room {0} is {1} and cannot be booked.").format(self.room, room_status)
@@ -875,6 +875,10 @@ class CheckedIn(Document):
         try:
             room = frappe.get_doc("Room", self.room)
 
+            # Don't clobber operational statuses set by housekeeping or DND flag
+            if room.status in ("DND", "Occupied Dirty"):
+                return
+
             # Update only when the room is not already marked as occupied
             if room.status != "Occupied":
                 room.status = "Occupied"
@@ -916,8 +920,35 @@ class CheckedIn(Document):
         """
         if self.status == "Checked In":
             self.mark_room_as_occupied()
+            self.sync_dnd_to_room()
         elif self.status == "Checked Out":
             self.mark_room_as_available()
+
+    def sync_dnd_to_room(self):
+        """
+        Mirror the stay's DND flag to the linked room's status.
+
+        - Toggling DND on for an in-house stay flips the room to "DND".
+        - Toggling DND off restores the room to "Occupied" (the next night audit
+          or housekeeping task will set "Occupied Dirty" when applicable).
+        - Other operational statuses (Out of Order/Service) are left alone.
+        """
+        if not self.room or self.status != "Checked In":
+            return
+
+        try:
+            current = frappe.db.get_value("Room", self.room, "status")
+            if self.do_not_disturb:
+                if current in ("Occupied", "Occupied Dirty"):
+                    frappe.db.set_value("Room", self.room, "status", "DND")
+            else:
+                if current == "DND":
+                    frappe.db.set_value("Room", self.room, "status", "Occupied")
+        except Exception as e:
+            frappe.log_error(
+                title=f"iHotel DND sync failed — {self.name}",
+                message=str(e),
+            )
 
     # ── ERPXpand Accounting Integration ────────────────────────────────────────
 

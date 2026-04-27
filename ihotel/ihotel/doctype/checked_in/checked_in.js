@@ -214,10 +214,13 @@ frappe.ui.form.on("Checked In", {
 					frappe.db.get_value("iHotel Profile", profile, "outstanding_balance").then(r2 => {
 						const bal = parseFloat((r2.message && r2.message.outstanding_balance) || 0);
 						if (bal > 0) {
+							const profile_url = `/app/ihotel-profile/${encodeURIComponent(profile)}`;
+							const settle_link = `<a href="${profile_url}" style="text-decoration: underline;">${__("Please settle")}</a>`;
 							frappe.msgprint({
 								title: __("Outstanding Balance"),
 								message: __("Cannot check out {0}. Outstanding balance of {1} must be settled before checkout.",
-									[frm.doc.guest, format_currency(bal)]),
+									[frm.doc.guest, format_currency(bal)])
+									+ "<br>" + __("{0} the outstanding balance to proceed.", [settle_link]),
 								indicator: "red",
 							});
 						} else {

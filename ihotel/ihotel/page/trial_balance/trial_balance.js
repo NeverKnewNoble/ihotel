@@ -160,6 +160,13 @@ class TrialBalance {
 		const first_day = new Date(today.getFullYear(), today.getMonth(), 1);
 		this.$root.find(".tb-from-date").val(first_day.toISOString().split("T")[0]);
 		this.$root.find(".tb-to-date").val(today.toISOString().split("T")[0]);
+
+		// Honour frappe.route_options when navigated from another page
+		// (e.g. the Night Audit form passes audit_date as from/to).
+		const opts = frappe.route_options || {};
+		if (opts.from_date) this.$root.find(".tb-from-date").val(opts.from_date);
+		if (opts.to_date)   this.$root.find(".tb-to-date").val(opts.to_date);
+		if (opts.from_date || opts.to_date) frappe.route_options = null;
 	}
 
 	bind_events() {
