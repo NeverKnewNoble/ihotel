@@ -8,6 +8,7 @@
  "field_order": [
   "profile_tab",
   "title",
+  "guest_type",
   "guest_name",
   "customer",
   "section_break_jpeh",
@@ -72,6 +73,15 @@
    "fieldtype": "Select",
    "label": "Title",
    "options": "\nMr\nMrs\nMs\nDr\nProf"
+  },
+  {
+   "default": "Individual",
+   "fieldname": "guest_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Guest Type",
+   "options": "Company\nIndividual\nPartnership",
+   "reqd": 1
   },
   {
    "fieldname": "guest_name",
@@ -362,7 +372,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-04-14 20:38:22.540793",
+ "modified": "2026-04-27 21:41:00.776299",
  "modified_by": "Administrator",
  "module": "iHotel",
  "name": "Guest",
