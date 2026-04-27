@@ -23,7 +23,14 @@
   "revpar",
   "section_break_dbgv",
   "audit_notes",
-  "erpnext_journal_entry"
+  "erpnext_journal_entry",
+  "charges_tab",
+  "charges_summary",
+  "charges",
+  "payments_tab",
+  "payments_summary",
+  "payments",
+  "transactions_loaded_on"
  ],
  "fields": [
   {
@@ -121,6 +128,49 @@
   {
    "fieldname": "column_break_poej",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "charges_tab",
+   "fieldtype": "Tab Break",
+   "label": "Charges"
+  },
+  {
+   "fieldname": "charges_summary",
+   "fieldtype": "Data",
+   "label": "Charges Verified",
+   "read_only": 1,
+   "default": "0 / 0"
+  },
+  {
+   "fieldname": "charges",
+   "fieldtype": "Table",
+   "label": "Charges",
+   "options": "Night Audit Charge"
+  },
+  {
+   "fieldname": "payments_tab",
+   "fieldtype": "Tab Break",
+   "label": "Payments"
+  },
+  {
+   "fieldname": "payments_summary",
+   "fieldtype": "Data",
+   "label": "Payments Verified",
+   "read_only": 1,
+   "default": "0 / 0"
+  },
+  {
+   "fieldname": "payments",
+   "fieldtype": "Table",
+   "label": "Payments",
+   "options": "Night Audit Payment"
+  },
+  {
+   "fieldname": "transactions_loaded_on",
+   "fieldtype": "Datetime",
+   "label": "Transactions Last Loaded",
+   "read_only": 1,
+   "hidden": 1
   }
  ],
  "grid_page_length": 50,
@@ -182,6 +232,18 @@
    "submit": 1,
    "cancel": 1,
    "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "report": 1,
+   "share": 1
+  },
+  {
+   "role": "Night Auditor",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
    "email": 1,
    "export": 1,
    "print": 1,

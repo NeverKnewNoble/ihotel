@@ -9,6 +9,7 @@ ALLOWED_ROOM_STATUSES = [
 	"Occupied Dirty",
 	"Out of Order",
 	"Out of Service",
+	"DND",
 ]
 
 OOO_STATUSES = {"Out of Order", "Out of Service"}

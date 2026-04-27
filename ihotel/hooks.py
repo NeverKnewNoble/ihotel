@@ -12,6 +12,7 @@ fixtures = [
 	{"doctype": "Business Channel Category", "filters": [["module" , "in" , ("ihotel" )]]},
 	{"doctype": "Notification", "filters": [["name", "in", ["Reservation Confirmation Letter", "Reservation Unconfirmation Letter"]]]},
 	{"doctype": "Workspace Sidebar", "filters": [["name", "=", "iHotel"]]},
+	{"doctype": "Role", "filters": [["name", "in", ["Night Auditor"]]]},
 ]
 
 # Apps
@@ -103,7 +104,8 @@ doctype_calendar_js = {
 # ------------
 
 # before_install = "ihotel.install.before_install"
-# after_install = "ihotel.install.after_install"
+after_install = "ihotel.install.after_install"
+after_migrate = ["ihotel.install.after_install"]
 
 # Uninstallation
 # ------------

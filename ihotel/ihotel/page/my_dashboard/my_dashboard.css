@@ -82,6 +82,22 @@
     color: var(--ih-text-muted);
 }
 
+.ih-header-left .ih-date-input {
+    font-size: 13px;
+    color: var(--ih-text);
+    background: var(--ih-card);
+    border: 1px solid var(--ih-border);
+    border-radius: var(--ih-radius-sm);
+    padding: 4px 8px;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.ih-header-left .ih-date-input:focus {
+    outline: none;
+    border-color: var(--ih-primary);
+}
+
 .ih-refresh-btn {
     display: inline-flex;
     align-items: center;
@@ -275,6 +291,7 @@
 .ih-status-dot.dirty        { background: var(--ih-orange); }
 .ih-status-dot.housekeeping { background: var(--ih-amber); }
 .ih-status-dot.out-of-order { background: var(--ih-red); }
+.ih-status-dot.dnd          { background: #a855f7; }
 
 .ih-status-label {
     font-size: 13px;
@@ -311,6 +328,7 @@
 .ih-status-bar-fill.dirty        { background: var(--ih-orange); }
 .ih-status-bar-fill.housekeeping { background: var(--ih-amber); }
 .ih-status-bar-fill.out-of-order { background: var(--ih-red); }
+.ih-status-bar-fill.dnd          { background: #a855f7; }
 
 /* ---------- Tables ---------- */
 .ih-table {

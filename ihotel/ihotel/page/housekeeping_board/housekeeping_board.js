@@ -40,6 +40,11 @@ frappe.pages["housekeeping-board"].on_page_load = function (wrapper) {
 					<div class="hkb-stat-label">Out of Service</div>
 					<div class="hkb-stat-count" data-key="Out of Service">0</div>
 				</div>
+				<div class="hkb-stat" data-status="DND">
+					<div class="hkb-stat-dot" style="background:#a855f7;"></div>
+					<div class="hkb-stat-label">DND</div>
+					<div class="hkb-stat-count" data-key="DND">0</div>
+				</div>
 			</div>
 
 			<!-- Filter card -->
@@ -61,6 +66,7 @@ frappe.pages["housekeeping-board"].on_page_load = function (wrapper) {
 							<option>Occupied Dirty</option>
 							<option>Out of Order</option>
 							<option>Out of Service</option>
+							<option>DND</option>
 						</select>
 						<button class="hkb-bulk-apply btn btn-xs btn-primary">Apply</button>
 					</div>
@@ -76,6 +82,7 @@ frappe.pages["housekeeping-board"].on_page_load = function (wrapper) {
 						<button class="hkb-pill" data-status="Occupied"><span class="hkb-dot" style="background:#3b82f6;"></span>Occupied <span class="hkb-pill-count">0</span></button>
 						<button class="hkb-pill" data-status="Out of Order"><span class="hkb-dot" style="background:#ef4444;"></span>Out of Order <span class="hkb-pill-count">0</span></button>
 						<button class="hkb-pill" data-status="Out of Service"><span class="hkb-dot" style="background:#6b7280;"></span>Out of Service <span class="hkb-pill-count">0</span></button>
+						<button class="hkb-pill" data-status="DND"><span class="hkb-dot" style="background:#a855f7;"></span>DND <span class="hkb-pill-count">0</span></button>
 					</div>
 				</div>
 			</div>
@@ -232,9 +239,10 @@ class HKBoard {
 			"Occupied Dirty": "#f97316",
 			"Out of Order":   "#ef4444",
 			"Out of Service": "#6b7280",
+			"DND":            "#a855f7",
 		};
 
-		const status_opts = ["Available","Occupied","Vacant Dirty","Occupied Dirty","Out of Order","Out of Service"];
+		const status_opts = ["Available","Occupied","Vacant Dirty","Occupied Dirty","Out of Order","Out of Service","DND"];
 
 		const cards = rooms.map(room => {
 			const color = colors[room.status] || "#6b7280";

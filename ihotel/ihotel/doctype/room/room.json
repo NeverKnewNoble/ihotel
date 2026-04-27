@@ -44,7 +44,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "Available\nOccupied\nVacant Dirty\nOccupied Dirty\nOut of Order\nOut of Service"
+   "options": "Available\nOccupied\nVacant Dirty\nOccupied Dirty\nOut of Order\nOut of Service\nDND"
   },
   {
    "fieldname": "column_break_fidn",
